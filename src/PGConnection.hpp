@@ -6,8 +6,12 @@
 #define PGQUEUE_PGCONNECTION_HPP
 
 #include <libpq-fe.h>
+#include <atomic>
 #include <string>
 #include <iostream>
+#include <functional>
+#include <liburing.h>
+#include "PGQueryStructures.hpp"
 
 class PGConnection {
 public:
@@ -26,10 +30,13 @@ public:
 
     enum PGConnectionStep {
         PGConnectionStep_NotSet,
+        PGConnectionStep_Processing,
+        PGConnectionStep_Done,
     };
 private:
-    PGConnectionState connectionState{NOT_SET};
-    PGConnectionStep step{PGConnectionStep_NotSet};
+    std::atomic<PGConnectionState> connectionState{NOT_SET};
+    std::atomic<PGConnectionStep> step{PGConnectionStep_NotSet};
+    std::function<void(PGResultSet&&)> callback;
     int pgfd;
     pg_conn* conn = nullptr;
 private:
@@ -37,11 +44,29 @@ private:
         std::cerr << msg << "\n";
     }
 
+    /**
+     * Populates the response with the results from the SQL query
+     * @param result
+     * @param response
+     */
+    static void handleResult(PGresult* result, PGQueryResponse* response) {
+        int nbRows = PQntuples(result);
+        int nbFields = PQnfields(result);
+
+        for (int rowIndex{}; rowIndex < nbRows; rowIndex += 1) {
+            PGRow row{};
+            for (int fieldIndex{}; fieldIndex < nbFields; fieldIndex += 1) {
+                row.addField(PQfname(result, fieldIndex), PQgetvalue(result, rowIndex, fieldIndex));
+            }
+            response->resultSet.rows.emplace_back(std::move(row));
+        }
+    }
 public:
     ~PGConnection() {
         if (PQstatus(conn) == CONNECTION_OK) {
             PQfinish(conn);
         }
+        close(pgfd);
     }
 
     /**
@@ -54,6 +79,10 @@ public:
 
     [[nodiscard]] PGConnectionState getState() const {
         return connectionState;
+    }
+
+    [[nodiscard]] bool isReady() const {
+        return connectionState == READY;
     }
 
     /**
@@ -95,7 +124,7 @@ public:
                         pgfd = PQsocket(conn);
                         return PGConnectionResult::OK;
                     case PGRES_POLLING_FAILED:
-                        printError("Could not connect to the database. Check the connection string.");
+                        printError("Could not connectAll to the database. Check the connection string.");
                         return PGConnectionResult::FAILED;
                     default:
                         isPolling = true;
@@ -112,12 +141,109 @@ public:
         ev.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR | EPOLLRDHUP;
         ev.data.fd = pgfd;
         io_uring_prep_epoll_ctl(sqe, epfd, pgfd, EPOLL_CTL_ADD, &ev);
+        io_uring_sqe_set_data(sqe, (void*) this);
         io_uring_submit(ring);
+    }
+
+    /**
+     * Sends the query to the database
+     * @param request
+     */
+    bool sendRequestIfReady(PGQueryRequest* request) {
+        if (connectionState == READY) {
+            connectionState = NOT_READY;
+            std::swap(callback, request->callback);
+
+            int res{};
+            switch (request->queryParams->type) {
+                case PGQueryParams::PLAIN_QUERY:
+                    res = PQsendQuery(conn, request->queryParams->command);
+                    break;
+                case PGQueryParams::QUERY_WITH_PARAMS:
+                    res = PQsendQueryParams(
+                            conn,
+                            request->queryParams->command,
+                            request->queryParams->nParams,
+                            request->queryParams->paramTypes,
+                            request->queryParams->paramValues,
+                            request->queryParams->paramLengths,
+                            request->queryParams->paramFormats,
+                            request->queryParams->resultFormat
+                    );
+                    break;
+            }
+
+            if (res == 0) {
+                printError("PQsendQuery");
+                exit(EXIT_FAILURE);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    void handleQueryResponseBegin() {
+        step = PGConnectionStep_Processing;
+        if (PQflush(conn) == 0) {
+            if (PQconsumeInput(conn) == 0) {
+                printError("PQconsumeInput");
+                exit(EXIT_FAILURE);
+            }
+
+            if (PQisBusy(conn) == 0) {
+                auto response = new PGQueryResponse();
+                std::swap(response->callback, callback);
+
+                PGresult* result = PQgetResult(conn);
+                while (result != nullptr) {
+                    switch (PQresultStatus(result)) {
+                        case PGRES_TUPLES_OK:
+                            handleResult(result, response);
+                            break;
+                        case PGRES_EMPTY_QUERY:
+                        case PGRES_COMMAND_OK:
+                            // no data from the server
+                            break;
+                        case PGRES_COPY_OUT:
+                            break;
+                        case PGRES_COPY_IN:
+                            break;
+                        case PGRES_BAD_RESPONSE:
+                            break;
+                        case PGRES_NONFATAL_ERROR:
+                            break;
+                        case PGRES_FATAL_ERROR:
+                            response->resultSet.errorMsg = PQresultErrorMessage(result);
+                            if (response->resultSet.errorMsg.empty()) {
+                                response->resultSet.errorMsg = PQerrorMessage(conn);
+                            }
+                            break;
+                        case PGRES_COPY_BOTH:
+                            break;
+                        case PGRES_SINGLE_TUPLE:
+                            break;
+                        case PGRES_PIPELINE_SYNC:
+                            break;
+                        case PGRES_PIPELINE_ABORTED:
+                            break;
+                    }
+                    result = PQgetResult(conn);
+                }
+
+                PQclear(result);
+
+                // processor->pushResponse(response);
+                connectionState = READY;
+                step = PGConnectionStep_NotSet;
+            }
+        }
     }
 
     void doNextStep(io_uring *ring, int res) {
         switch (step) {
             case PGConnectionStep_NotSet:
+                handleQueryResponseBegin();
                 break;
         }
     }

@@ -1,13 +1,19 @@
 #include <iostream>
 #include <latch>
+#include <chrono>
 
 #include "src/PGQueryProcessor.hpp"
 
 int main() {
+    using namespace std::chrono_literals;
+
     std::latch latch{1};
     PGQueryProcessor p{"host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485"};
-    p.init();
-    p.push(PGQBuilder("select 1 from member").build());
+    p.go();
+    //for (int i{}; i < 10; i += 1) {
+    //    std::this_thread::sleep_for(3s);
+        p.push(PGQBuilder("select 1 from member").build());
+    //}
     latch.wait();
     return 0;
 }
