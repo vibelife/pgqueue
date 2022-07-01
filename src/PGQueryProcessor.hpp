@@ -19,7 +19,8 @@
 
 class PGQueryProcessor {
 private:
-    rigtorp::MPMCQueue<PGQueryRequest*> requests{24};
+    rigtorp::MPMCQueue<PGQueryRequest*> requests;
+    rigtorp::MPMCQueue<PGQueryResponse*> responses;
     PGConnectionPool* pool{};
     char const* connString;
     std::thread thread;
@@ -49,8 +50,8 @@ private:
         cv.notify_one();
     }
 public:
-    PGQueryProcessor(char const* connectionString)
-        :connString(connectionString) {}
+    PGQueryProcessor(char const* connectionString, size_t depth = 128)
+        :connString(connectionString), requests(depth), responses(depth) {}
 
     ~PGQueryProcessor() {
         thread.join();
@@ -62,7 +63,7 @@ public:
      */
     void go() {
         pool = new PGConnectionPool{};
-        pool->go(connString, 2, requestsReady, m, cv, requests);
+        pool->go(connString, 2, requestsReady, m, cv, requests, responses);
     }
 
     /**

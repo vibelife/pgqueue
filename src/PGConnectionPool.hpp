@@ -96,8 +96,8 @@ public:
     /**
      * Process requests
      */
-    void go(char const* connectionString, unsigned int nbConnections, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests) {
-        thrd = std::thread([this, connectionString, nbConnections, &requests, &m, &cv, &requestsReady] {
+    void go(char const* connectionString, unsigned int nbConnections, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+        thrd = std::thread([this, connectionString, nbConnections, &requests, &responses, &m, &cv, &requestsReady] {
             // set up liburing
             struct io_uring ring{};
             int ret = io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
@@ -152,7 +152,7 @@ public:
 
                             auto ptr = static_cast<PGConnection*>(io_uring_cqe_get_data(cqe));
                             if (ptr != nullptr) {
-                                ptr->doNextStep(&ring, cqe->res);
+                                ptr->doNextStep(cqe->res, responses);
                             }
                         }
                         io_uring_cqe_seen(&ring, cqe);

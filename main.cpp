@@ -10,10 +10,10 @@ int main() {
     std::latch latch{1};
     PGQueryProcessor p{"host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485"};
     p.go();
-    //for (int i{}; i < 10; i += 1) {
-    //    std::this_thread::sleep_for(3s);
+    for (int i{}; i < 10; i += 1) {
         p.push(PGQBuilder("select 1 from member").build());
-    //}
+        std::this_thread::sleep_for(3s);
+    }
     latch.wait();
     return 0;
 }

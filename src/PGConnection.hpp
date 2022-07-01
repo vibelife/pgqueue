@@ -183,7 +183,7 @@ public:
         return false;
     }
 
-    void handleQueryResponseBegin() {
+    void handleQueryResponse(rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
         step = PGConnectionStep_Processing;
         if (PQflush(conn) == 0) {
             if (PQconsumeInput(conn) == 0) {
@@ -233,19 +233,15 @@ public:
 
                 PQclear(result);
 
-                // processor->pushResponse(response);
+                responses.push(response);
                 connectionState = READY;
                 step = PGConnectionStep_NotSet;
             }
         }
     }
 
-    void doNextStep(io_uring *ring, int res) {
-        switch (step) {
-            case PGConnectionStep_NotSet:
-                handleQueryResponseBegin();
-                break;
-        }
+    void doNextStep(int res, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+        handleQueryResponse(responses);
     }
 };
 
