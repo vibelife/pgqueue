@@ -72,7 +72,6 @@ public:
             while (isRunning) {
                 PGQueryResponse* response{};
                 responses.pop(response);
-                // printf("(1) callback %ld\n", response->id);
                 auto cb = std::move(response->callback);
                 auto resultSet = std::move(response->resultSet);
                 delete response;
@@ -80,7 +79,6 @@ public:
                 // there may not be a callback
                 if (cb != nullptr) {
                     boost::asio::post(threadPool, [cb = std::move(cb), resultSet = std::move(resultSet)] () mutable {
-                        // printf("(2) callback %ld\n", response);
                         cb(std::move(resultSet));
                     });
                 }

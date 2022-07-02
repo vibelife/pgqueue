@@ -219,8 +219,12 @@ public:
         }
         if (pgIsBusy == 0) {
             PGresult* result{};
+
+            // these loops ensure that every callback is fired
             size_t nb{callbacks.size()};
             for (size_t i{0}; i < nb; i += 1) {
+                // the logic for pipeline handling is outlined here:
+                // https://www.postgresql.org/docs/14/libpq-pipeline-mode.html
                 while ((result = PQgetResult(conn)) != nullptr) {
                     int status = PQresultStatus(result);
                     if (status == PGRES_PIPELINE_SYNC) {
@@ -261,6 +265,8 @@ public:
                         case PGRES_PIPELINE_SYNC:
                             break;
                         case PGRES_PIPELINE_ABORTED:
+                            break;
+                        default:
                             break;
                     }
 
