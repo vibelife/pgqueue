@@ -9,6 +9,7 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <boost/asio.hpp>
 
 #include "MPMCQueue.hpp"
 #include "PGQueryStructures.hpp"
@@ -23,10 +24,12 @@ private:
     rigtorp::MPMCQueue<PGQueryResponse*> responses;
     PGConnectionPool* pool{};
     char const* connString;
-    std::thread thread;
+    std::thread responseHandlerThread;
     bool requestsReady{};
+    std::atomic<bool> isRunning{true};
     std::condition_variable cv;
-    std::mutex m;
+    std::mutex mRequests;
+    boost::asio::thread_pool threadPool;
 private:
     static void printError(const char* errMsg, int err) {
         std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
@@ -40,7 +43,7 @@ private:
         requests.push(request);
 
         {
-            std::lock_guard lk(m);
+            std::lock_guard lk(mRequests);
             if (requestsReady) {
                 return;
             }
@@ -50,20 +53,39 @@ private:
         cv.notify_one();
     }
 public:
-    PGQueryProcessor(char const* connectionString, size_t depth = 128)
-        :connString(connectionString), requests(depth), responses(depth) {}
+    PGQueryProcessor(char const* connectionString, size_t depth = 128, size_t nbThreads = 4)
+        :connString(connectionString), requests(depth), responses(depth), threadPool(nbThreads)
+    {}
 
     ~PGQueryProcessor() {
-        thread.join();
+        responseHandlerThread.join();
         delete pool;
     }
 
     /**
-     * Process requests
+     * Process requests in a background thread
      */
-    void go() {
+    void go(unsigned connPoolSize = 4) {
         pool = new PGConnectionPool{};
-        pool->go(connString, 2, requestsReady, m, cv, requests, responses);
+        pool->go(connString, connPoolSize, requestsReady, mRequests, cv, requests, responses);
+        responseHandlerThread = std::thread([&] {
+            while (isRunning) {
+                PGQueryResponse* response{};
+                responses.pop(response);
+                // printf("(1) callback %ld\n", response->id);
+                auto cb = std::move(response->callback);
+                auto resultSet = std::move(response->resultSet);
+                delete response;
+
+                // there may not be a callback
+                if (cb != nullptr) {
+                    boost::asio::post(threadPool, [cb = std::move(cb), resultSet = std::move(resultSet)] () mutable {
+                        // printf("(2) callback %ld\n", response);
+                        cb(std::move(resultSet));
+                    });
+                }
+            }
+        });
     }
 
     /**

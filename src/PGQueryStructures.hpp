@@ -13,6 +13,8 @@
 
 #include "PGQueryParams.hpp"
 
+#undef printf
+
 class PGRow {
 private:
     bool isCleared{};
@@ -79,6 +81,13 @@ class PGResultSet {
 public:
     std::string errorMsg{};
     std::vector<PGRow> rows{};
+
+    PGResultSet() = default;
+
+    PGResultSet(PGResultSet &&other) noexcept {
+        std::swap(errorMsg, other.errorMsg);
+        std::swap(rows, other.rows);
+    }
 };
 
 static constexpr auto NOOP = [](auto){};
