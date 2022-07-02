@@ -29,7 +29,9 @@ private:
     std::atomic<bool> isRunning{true};
     std::condition_variable cv;
     std::mutex mRequests;
-    boost::asio::thread_pool threadPool;
+    boost::asio::thread_pool responseThreadPool;
+    unsigned int nbConnectionsInPool{};
+    unsigned int nbQueriesPerConnection{};
 private:
     static void printError(const char* errMsg, int err) {
         std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
@@ -53,8 +55,14 @@ private:
         cv.notify_one();
     }
 public:
-    PGQueryProcessor(char const* connectionString, size_t depth = 128, size_t nbThreads = 4)
-        :connString(connectionString), requests(depth), responses(depth), threadPool(nbThreads)
+    explicit PGQueryProcessor(
+            char const* connectionString,
+            unsigned int nbConnectionsInPool = 4,
+            unsigned int nbQueriesPerConnection = 4,
+            size_t maxQueueDepth = 128,
+            size_t nbThreadsInResponseCallbackPool = 4
+        )
+        : connString(connectionString), requests(maxQueueDepth), responses(maxQueueDepth), responseThreadPool(nbThreadsInResponseCallbackPool), nbConnectionsInPool(nbConnectionsInPool), nbQueriesPerConnection(nbQueriesPerConnection)
     {}
 
     ~PGQueryProcessor() {
@@ -65,9 +73,9 @@ public:
     /**
      * Process requests in a background thread
      */
-    void go(unsigned connPoolSize = 4) {
+    void go() {
         pool = new PGConnectionPool{};
-        pool->go(connString, connPoolSize, requestsReady, mRequests, cv, requests, responses);
+        pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, requestsReady, mRequests, cv, requests, responses);
         responseHandlerThread = std::thread([&] {
             while (isRunning) {
                 PGQueryResponse* response{};
@@ -78,7 +86,7 @@ public:
 
                 // there may not be a callback
                 if (cb != nullptr) {
-                    boost::asio::post(threadPool, [cb = std::move(cb), resultSet = std::move(resultSet)] () mutable {
+                    boost::asio::post(responseThreadPool, [cb = std::move(cb), resultSet = std::move(resultSet)] () mutable {
                         cb(std::move(resultSet));
                     });
                 }

@@ -33,7 +33,7 @@ private:
     std::queue<std::function<void(PGResultSet&&)>> callbacks{};
     int pgfd{};
     pg_conn* conn = nullptr;
-    unsigned nbMaxPending{32};
+    unsigned nbMaxPending{4};
 private:
     static void printError(std::string const& msg) {
         std::cerr << msg << "\n";

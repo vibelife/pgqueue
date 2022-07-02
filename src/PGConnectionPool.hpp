@@ -44,30 +44,11 @@ private:
      * @param ring
      * @param connectionString
      * @param nbConnections
+     * @param nbQueriesPerConnection
      */
-    void connectAllURing(struct io_uring *ring, char const* connectionString, unsigned int nbConnections) {
+    void connectAllEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection) {
         for (int i = 0; i < nbConnections; i += 1) {
-            auto conn = new PGConnection();
-            if (conn->connect(connectionString) == PGConnection::PGConnectionResult_Ok) {
-                conn->setupURing(epfd, ring);
-                connections.emplace(conn->fd(), conn);
-            } else {
-                // if any connection fails, then we quit.
-                exit(EXIT_FAILURE);
-            }
-        }
-        std::cout << "Connection Pool: " << nbConnections << " connection(s) established" << "\n";
-    }
-
-    /**
-     * Create multiple connections to the database
-     * @param ring
-     * @param connectionString
-     * @param nbConnections
-     */
-    void connectAllEPoll(char const* connectionString, unsigned int nbConnections) {
-        for (int i = 0; i < nbConnections; i += 1) {
-            auto conn = new PGConnection();
+            auto conn = new PGConnection(nbQueriesPerConnection);
             if (conn->connect(connectionString) == PGConnection::PGConnectionResult_Ok) {
                 conn->setupEPoll(epfd);
                 connections.emplace(conn->fd(), conn);
@@ -122,15 +103,16 @@ public:
      * Handles sending queries with epoll
      * @param connectionString
      * @param nbConnections
+     * @param nbQueriesPerConnection
      * @param requestsReady
      * @param m
      * @param cv
      * @param requests
      * @param responses
      */
-    void runWithEPoll(char const* connectionString, unsigned int nbConnections, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+    void runWithEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
         // create multiple connections to the database
-        connectAllEPoll(connectionString, nbConnections);
+        connectAllEPoll(connectionString, nbConnections, nbQueriesPerConnection);
 
         struct epoll_event events[NB_EVENTS];
         std::unique_lock lock{m, std::defer_lock};
@@ -179,16 +161,24 @@ public:
 
     /**
      * Process queries in a background thread
+     * @param connectionString
+     * @param nbConnections
+     * @param nbQueriesPerConnection
+     * @param requestsReady
+     * @param m
+     * @param cv
+     * @param requests
+     * @param responses
      */
-    void go(char const* connectionString, unsigned int nbConnections, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
-        thrd = std::thread([this, connectionString, nbConnections, &requests, &responses, &m, &cv, &requestsReady] {
+    void go(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+        thrd = std::thread([this, connectionString, nbConnections, nbQueriesPerConnection, &requests, &responses, &m, &cv, &requestsReady] {
             epfd = epoll_create1(0);
             if (epfd < 0) {
                 printError("epoll_create1: ", epfd);
                 exit(EXIT_FAILURE);
             }
 
-            runWithEPoll(connectionString, nbConnections, requestsReady, m, cv, requests, responses);
+            runWithEPoll(connectionString, nbConnections, nbQueriesPerConnection, requestsReady, m, cv, requests, responses);
         });
     }
 };
