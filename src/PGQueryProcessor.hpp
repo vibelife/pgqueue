@@ -15,23 +15,25 @@
 #include "PGQueryStructures.hpp"
 #include "PGEventHandler.hpp"
 #include "PGConnectionPool.hpp"
+#include "PGQueryProcessingState.hpp"
 
 #undef strerror
 
 class PGQueryProcessor {
 private:
-    rigtorp::MPMCQueue<PGQueryRequest*> requests;
-    rigtorp::MPMCQueue<PGQueryResponse*> responses;
+    //rigtorp::MPMCQueue<PGQueryRequest*> requests;
+    //rigtorp::MPMCQueue<PGQueryResponse*> responses;
     PGConnectionPool* pool{};
     char const* connString;
-    std::thread responseHandlerThread;
-    bool requestsReady{};
-    std::atomic<bool> isRunning{true};
-    std::condition_variable cv;
-    std::mutex mRequests;
     boost::asio::thread_pool responseThreadPool;
     unsigned int nbConnectionsInPool{};
     unsigned int nbQueriesPerConnection{};
+    std::thread responseHandlerThread;
+
+    //std::condition_variable cvRequests;
+    //std::mutex mRequests;
+    //bool hasRequestsToProcess{};
+    PGQueryProcessingState state;
 private:
     static void printError(const char* errMsg, int err) {
         std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
@@ -42,17 +44,17 @@ private:
      * @return
      */
     void pushRequest(PGQueryRequest* request) {
-        requests.push(request);
+        state.requests.push(request);
 
         {
-            std::lock_guard lk(mRequests);
-            if (requestsReady) {
+            std::lock_guard lk(state.mRequests);
+            if (state.hasRequestsToProcess) {
                 return;
             }
 
-            requestsReady = true;
+            state.hasRequestsToProcess = true;
         }
-        cv.notify_one();
+        state.cvRequests.notify_one();
     }
 public:
     explicit PGQueryProcessor(
@@ -62,7 +64,7 @@ public:
             size_t maxQueueDepth = 128,
             size_t nbThreadsInResponseCallbackPool = 4
         )
-        : connString(connectionString), requests(maxQueueDepth), responses(maxQueueDepth), responseThreadPool(nbThreadsInResponseCallbackPool), nbConnectionsInPool(nbConnectionsInPool), nbQueriesPerConnection(nbQueriesPerConnection)
+        : state(maxQueueDepth), connString(connectionString), responseThreadPool(nbThreadsInResponseCallbackPool), nbConnectionsInPool(nbConnectionsInPool), nbQueriesPerConnection(nbQueriesPerConnection)
     {}
 
     ~PGQueryProcessor() {
@@ -75,20 +77,31 @@ public:
      */
     void go() {
         pool = new PGConnectionPool{};
-        pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, requestsReady, mRequests, cv, requests, responses);
+        pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
         responseHandlerThread = std::thread([&] {
-            while (isRunning) {
-                PGQueryResponse* response{};
-                responses.pop(response);
-                auto cb = std::move(response->callback);
-                auto resultSet = std::move(response->resultSet);
-                delete response;
+            while (state.isRunning) {
+                std::unique_lock lock{state.mResponses};
+                state.cvResponses.wait(lock, [&] { return state.hasResponsesToProcess; });
+                lock.unlock();
 
-                // there may not be a callback
-                if (cb != nullptr) {
-                    boost::asio::post(responseThreadPool, [cb = std::move(cb), resultSet = std::move(resultSet)] () mutable {
-                        cb(std::move(resultSet));
-                    });
+                while (!state.responses.empty()) {
+                    PGQueryResponse* response{};
+                    state.responses.pop(response);
+                    auto cb = std::move(response->callback);
+                    auto resultSet = std::move(response->resultSet);
+                    delete response;
+
+                    // there may not be a callback
+                    if (cb != nullptr) {
+                        boost::asio::post(responseThreadPool, [cb = std::move(cb), resultSet = std::move(resultSet)]() mutable {
+                            cb(std::move(resultSet));
+                        });
+                    }
+                }
+
+                {
+                    std::lock_guard lk(state.mResponses);
+                    state.hasResponsesToProcess = false;
                 }
             }
         });

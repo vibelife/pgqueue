@@ -13,6 +13,7 @@
 #include <liburing.h>
 #include <queue>
 #include "PGQueryStructures.hpp"
+#include "PGQueryProcessingState.hpp"
 
 class PGConnection {
 public:
@@ -206,7 +207,7 @@ public:
         return false;
     }
 
-    void handleQueryResponse(rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+    void handleQueryResponse(rigtorp::MPMCQueue<PGQueryResponse*> &responses, PGQueryProcessingState &state) {
         checkPGReady:
         if (PQconsumeInput(conn) == 0) {
             printError("PQconsumeInput");
@@ -232,7 +233,7 @@ public:
                         continue;
                     }
 
-                    auto response = new PGQueryResponse();
+                    auto response = new PGQueryResponse{};
                     std::swap(response->callback, callbacks.front());
                     callbacks.pop();
 
@@ -269,17 +270,27 @@ public:
                         default:
                             break;
                     }
+                    PQclear(result);
 
                     responses.push(response);
-
-                    PQclear(result);
                 }
             }
+
+
+            {
+                std::lock_guard lk(state.mResponses);
+                if (state.hasResponsesToProcess) {
+                    return;
+                }
+
+                state.hasResponsesToProcess = true;
+            }
+            state.cvResponses.notify_one();
         }
     }
 
-    void doNextStep(int res, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
-        handleQueryResponse(responses);
+    void doNextStep(int res, rigtorp::MPMCQueue<PGQueryResponse*> &responses, PGQueryProcessingState &state) {
+        handleQueryResponse(responses, state);
     }
 };
 

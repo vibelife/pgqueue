@@ -16,6 +16,8 @@
 #include "MPMCQueue.hpp"
 #include "PGConnection.hpp"
 
+#include "PGQueryProcessingState.hpp"
+
 #undef strerror
 
 class PGConnectionPool {
@@ -24,12 +26,18 @@ public:
     static constexpr unsigned int NB_EVENTS = 2;
     static constexpr unsigned int NB_CONNECTIONS = 2;
 private:
-    std::thread thrd;
-    bool isRunning = true;
-    int epfd{};
-    std::unordered_map<int, PGConnection*> connections{};
     static constexpr auto isReadyFn = [](auto const& p) { return p.second->isReady(); };
     static constexpr auto isDoneFn = [](auto const& p) { return p.second->isDone(); };
+
+
+    std::thread thrd;
+    int epfd{};
+
+    std::unordered_map<int, PGConnection*> connections{};
+    //PGQueryProcessingState* state;
+    //std::condition_variable cvResponses;
+    //std::mutex mResponses;
+    //bool hasResponsesToProcess;
 private:
     static void printError(const char* errMsg, int err) {
         std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
@@ -59,10 +67,12 @@ private:
         }
         std::cout << "Connection Pool: " << nbConnections << " connection(s) established" << "\n";
     }
-
 public:
+//    explicit PGConnectionPool(PGQueryProcessingState* state)
+//        :state(state)
+//    {}
+
     ~PGConnectionPool() {
-        isRunning = false;
         close(epfd);
         thrd.join();
         while (!connections.empty()) {
@@ -104,33 +114,34 @@ public:
      * @param connectionString
      * @param nbConnections
      * @param nbQueriesPerConnection
-     * @param requestsReady
+     * @param hasRequestsToProcess
      * @param m
-     * @param cv
+     * @param cvRequests
      * @param requests
      * @param responses
      */
-    void runWithEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
+    void runWithEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, PGQueryProcessingState &state) {
         // create multiple connections to the database
         connectAllEPoll(connectionString, nbConnections, nbQueriesPerConnection);
 
         struct epoll_event events[NB_EVENTS];
-        std::unique_lock lock{m, std::defer_lock};
 
-        while (isRunning) {
-            // wait for another thread to update [canProcess]
-            cv.wait(lock, [&requestsReady] { return requestsReady; });
+        while (state.isRunning) {
+            // wait for another thread to alert us when a query is submitted
+            std::unique_lock lock{state.mRequests};
+            state.cvRequests.wait(lock, [&] { return state.hasRequestsToProcess; });
+            lock.unlock();
 
             drainQueue:
             // Drain the queue as much as we can
-            while (!requests.empty() && hasReadyConnections()) {
+            while (!state.requests.empty() && hasReadyConnections()) {
                 PGQueryRequest* request{};
-                requests.pop(request);
+                state.requests.pop(request);
                 submit(request);
             }
 
             // check if there are more requests than available DB connections
-            bool hasMoreRequests = !requests.empty();
+            bool hasMoreRequests = !state.requests.empty();
 
             while (!isDone()) {
                 int nbFds = epoll_wait(epfd, events, NB_EVENTS, -1);
@@ -143,7 +154,7 @@ public:
                 }
 
                 for (int i = 0; i < nbFds; i += 1) {
-                    connections[events[i].data.fd]->doNextStep(1, responses);
+                    connections[events[i].data.fd]->doNextStep(1, state.responses, state);
                 }
             }
 
@@ -153,8 +164,8 @@ public:
                 // eventually the request queue will hit its cap and block the thread trying to add more.
                 goto drainQueue;
             } else {
-                std::unique_lock lk(m);
-                requestsReady = false;
+                std::lock_guard lk(state.mRequests);
+                state.hasRequestsToProcess = false;
             }
         }
     }
@@ -164,21 +175,17 @@ public:
      * @param connectionString
      * @param nbConnections
      * @param nbQueriesPerConnection
-     * @param requestsReady
-     * @param m
-     * @param cv
-     * @param requests
-     * @param responses
+     * @param state
      */
-    void go(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, bool &requestsReady, std::mutex &m, std::condition_variable &cv, rigtorp::MPMCQueue<PGQueryRequest*> &requests, rigtorp::MPMCQueue<PGQueryResponse*> &responses) {
-        thrd = std::thread([this, connectionString, nbConnections, nbQueriesPerConnection, &requests, &responses, &m, &cv, &requestsReady] {
+    void go(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, PGQueryProcessingState &state) {
+        thrd = std::thread([this, connectionString, nbConnections, nbQueriesPerConnection, &state] {
             epfd = epoll_create1(0);
             if (epfd < 0) {
                 printError("epoll_create1: ", epfd);
                 exit(EXIT_FAILURE);
             }
 
-            runWithEPoll(connectionString, nbConnections, nbQueriesPerConnection, requestsReady, m, cv, requests, responses);
+            runWithEPoll(connectionString, nbConnections, nbQueriesPerConnection, state);
         });
     }
 };

@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 add_executable(${PROJECT_NAME}
         main.cpp
         src/MPMCQueue.hpp
-        src/PGQueryProcessor.hpp src/PGQueryParams.hpp src/PGQueryStructures.hpp src/PGEventHandler.hpp src/PGConnection.hpp src/PGConnectionPool.hpp src/common/TimeUtils.hpp)
+        src/PGQueryProcessor.hpp src/PGQueryParams.hpp src/PGQueryStructures.hpp src/PGEventHandler.hpp src/PGConnection.hpp src/PGConnectionPool.hpp src/common/TimeUtils.hpp src/PGQueryProcessingState.hpp)
 
 find_package(PkgConfig REQUIRED)
 find_package(Boost REQUIRED COMPONENTS context system regex)
