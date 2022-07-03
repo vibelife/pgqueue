@@ -48,11 +48,11 @@ private:
 
         {
             std::lock_guard lk(state.mRequests);
-            if (state.hasRequestsToProcess) {
+            if (state.requestsLockState == PGQueryProcessingState::LockStates_GO) {
                 return;
             }
 
-            state.hasRequestsToProcess = true;
+            state.requestsLockState = PGQueryProcessingState::LockStates_GO;
         }
         state.cvRequests.notify_one();
     }
@@ -68,6 +68,7 @@ public:
     {}
 
     ~PGQueryProcessor() {
+        state.cleanUp();
         responseHandlerThread.join();
         delete pool;
     }
@@ -81,7 +82,7 @@ public:
         responseHandlerThread = std::thread([&] {
             while (state.isRunning) {
                 std::unique_lock lock{state.mResponses};
-                state.cvResponses.wait(lock, [&] { return state.hasResponsesToProcess; });
+                state.cvResponses.wait(lock, [&] { return state.responsesLockState; });
                 lock.unlock();
 
                 while (!state.responses.empty()) {
@@ -101,7 +102,7 @@ public:
 
                 {
                     std::lock_guard lk(state.mResponses);
-                    state.hasResponsesToProcess = false;
+                    state.responsesLockState = PGQueryProcessingState::LockStates_WAIT;
                 }
             }
         });

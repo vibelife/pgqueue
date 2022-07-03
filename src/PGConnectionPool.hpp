@@ -75,8 +75,8 @@ public:
     ~PGConnectionPool() {
         close(epfd);
         thrd.join();
-        while (!connections.empty()) {
-            delete connections.begin()->second;
+        for (auto& p : connections) {
+            delete p.second;
         }
         connections.clear();
     }
@@ -129,7 +129,7 @@ public:
         while (state.isRunning) {
             // wait for another thread to alert us when a query is submitted
             std::unique_lock lock{state.mRequests};
-            state.cvRequests.wait(lock, [&] { return state.hasRequestsToProcess; });
+            state.cvRequests.wait(lock, [&] { return state.requestsLockState; });
             lock.unlock();
 
             drainQueue:
@@ -165,7 +165,7 @@ public:
                 goto drainQueue;
             } else {
                 std::lock_guard lk(state.mRequests);
-                state.hasRequestsToProcess = false;
+                state.requestsLockState = PGQueryProcessingState::LockStates_WAIT;
             }
         }
     }

@@ -137,20 +137,6 @@ public:
         }
         return retVal;
     }
-    /**
-     * Sets up io_uring
-     * @param epfd
-     * @param ring
-     */
-    void setupURing(int epfd, io_uring *ring) const {
-        io_uring_sqe* sqe = io_uring_get_sqe(ring);
-        struct epoll_event ev{};
-        ev.events = EPOLLIN | EPOLLOUT | EPOLLHUP | EPOLLERR | EPOLLRDHUP;
-        ev.data.fd = pgfd;
-        io_uring_prep_epoll_ctl(sqe, epfd, pgfd, EPOLL_CTL_ADD, &ev);
-        io_uring_sqe_set_data(sqe, (void*) this);
-        io_uring_submit(ring);
-    }
 
     /**
      * Sets up epoll
@@ -197,7 +183,12 @@ public:
                 exit(EXIT_FAILURE);
             }
 
-            callbacks.push(request->callback);
+            // steal the callback in the request
+            auto callback = std::move(request->callback);
+            // now we can delete the request
+            delete request;
+            // the callback will be used later when the SQL is processed
+            callbacks.push(std::move(callback));
 
             res = PQflush(conn);
             res = PQpipelineSync(conn);
@@ -279,11 +270,11 @@ public:
 
             {
                 std::lock_guard lk(state.mResponses);
-                if (state.hasResponsesToProcess) {
+                if (state.responsesLockState == PGQueryProcessingState::LockStates_GO) {
                     return;
                 }
 
-                state.hasResponsesToProcess = true;
+                state.responsesLockState = PGQueryProcessingState::LockStates_GO;
             }
             state.cvResponses.notify_one();
         }
