@@ -66,6 +66,18 @@ public:
         delete pool;
     }
 
+    static PGQueryProcessor* createInstance(
+            char const* connectionString,
+            unsigned int nbConnectionsInPool = 4,
+            unsigned int nbQueriesPerConnection = 4,
+            size_t maxQueueDepth = 128,
+            size_t nbThreadsInResponseCallbackPool = 4
+    ) {
+        auto retVal = new PGQueryProcessor(connectionString, nbConnectionsInPool, nbQueriesPerConnection, maxQueueDepth, nbThreadsInResponseCallbackPool);
+        retVal->go();
+        return retVal;
+    }
+
     /**
      * Connects to the database, and stats the request processor in a background thread.
      */
@@ -103,12 +115,39 @@ public:
 
     /**
      * Pushes a query onto the queue
+     * @param q - The SQL query
+     * @param callback - If this is null it is like a fire-and-forget.
+     * @return
+     */
+    void push(std::string&& q, std::function<void(PGResultSet&&)>&& callback = nullptr) {
+        if (state.isRunning) {
+            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(std::move(q)).build(), std::move(callback)});
+        }
+    }
+
+    /**
+     * Pushes a query onto the queue
+     * @param q - The SQL query
+     * @param nbChars - The length of the SQL query
+     * @param callback - If this is null it is like a fire-and-forget.
+     * @return
+     */
+    void push(char const* q, size_t nbChars, std::function<void(PGResultSet&&)>&& callback = nullptr) {
+        if (state.isRunning) {
+            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(q, nbChars).build(), std::move(callback)});
+        }
+    }
+
+    /**
+     * Pushes a query onto the queue
      * @param queryParams - The SQL query params
      * @param callback - If this is null it is like a fire-and-forget.
      * @return
      */
     void push(PGQueryParams* queryParams, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        pushRequest(new PGQueryRequest{false, queryParams, std::move(callback)});
+        if (state.isRunning && queryParams != nullptr) {
+            pushRequest(new PGQueryRequest{false, queryParams, std::move(callback)});
+        }
     }
 };
 

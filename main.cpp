@@ -10,8 +10,7 @@ int main() {
     static constexpr size_t MAX_QUERIES = 10;
     // std::latch latch{1};
     {
-        PGQueryProcessor p{"host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485"};
-        p.go();
+        auto p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485");
 
         auto t = now();
         for (int a{}; a < 1; a += 1) {
@@ -25,6 +24,7 @@ int main() {
             }
             std::this_thread::sleep_for(1s);
         }
+        delete p;
     }
     // latch.wait();
     return 0;
