@@ -13,7 +13,6 @@
 
 #include "MPMCQueue.hpp"
 #include "PGQueryStructures.hpp"
-#include "PGEventHandler.hpp"
 #include "PGConnectionPool.hpp"
 #include "PGQueryProcessingState.hpp"
 
