@@ -21,23 +21,13 @@
 #undef strerror
 
 class PGConnectionPool {
-public:
-    static constexpr auto QUEUE_DEPTH = 128;
-    static constexpr unsigned int NB_EVENTS = 2;
-    static constexpr unsigned int NB_CONNECTIONS = 2;
 private:
+    static constexpr unsigned int NB_EVENTS = 2;
     static constexpr auto isReadyFn = [](auto const& p) { return p.second->isReady(); };
     static constexpr auto isDoneFn = [](auto const& p) { return p.second->isDone(); };
-
-
     std::thread thrd;
     int epfd{};
-
     std::unordered_map<int, PGConnection*> connections{};
-    //PGQueryProcessingState* state;
-    //std::condition_variable cvResponses;
-    //std::mutex mResponses;
-    //bool hasResponsesToProcess;
 private:
     static void printError(const char* errMsg, int err) {
         std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
@@ -68,10 +58,6 @@ private:
         std::cout << "Connection Pool: " << nbConnections << " connection(s) established" << "\n";
     }
 public:
-//    explicit PGConnectionPool(PGQueryProcessingState* state)
-//        :state(state)
-//    {}
-
     ~PGConnectionPool() {
         close(epfd);
         thrd.join();

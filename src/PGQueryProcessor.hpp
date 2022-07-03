@@ -20,18 +20,12 @@
 
 class PGQueryProcessor {
 private:
-    //rigtorp::MPMCQueue<PGQueryRequest*> requests;
-    //rigtorp::MPMCQueue<PGQueryResponse*> responses;
     PGConnectionPool* pool{};
     char const* connString;
     boost::asio::thread_pool responseThreadPool;
     unsigned int nbConnectionsInPool{};
     unsigned int nbQueriesPerConnection{};
     std::thread responseHandlerThread;
-
-    //std::condition_variable cvRequests;
-    //std::mutex mRequests;
-    //bool hasRequestsToProcess{};
     PGQueryProcessingState state;
 private:
     static void printError(const char* errMsg, int err) {
@@ -73,7 +67,7 @@ public:
     }
 
     /**
-     * Process requests in a background thread
+     * Connects to the database, and stats the request processor in a background thread.
      */
     void go() {
         pool = new PGConnectionPool{};

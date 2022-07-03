@@ -12,7 +12,7 @@ add_executable(${PROJECT_NAME}
         src/PGQueryProcessor.hpp src/PGQueryParams.hpp src/PGQueryStructures.hpp src/PGConnection.hpp src/PGConnectionPool.hpp src/common/TimeUtils.hpp src/PGQueryProcessingState.hpp)
 
 find_package(PkgConfig REQUIRED)
-find_package(Boost REQUIRED COMPONENTS context system regex)
+find_package(Boost REQUIRED COMPONENTS context system)
 link_libraries(${Boost_LIBRARIES})
 
 find_package(Threads)
