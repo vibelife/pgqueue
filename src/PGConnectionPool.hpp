@@ -126,9 +126,6 @@ public:
                 submit(request);
             }
 
-            // check if there are more requests than available DB connections
-            bool hasMoreRequests = !state.requests.empty();
-
             while (!isDone()) {
                 int nbFds = epoll_wait(epfd, events, NB_EVENTS, -1);
                 if (nbFds == -1) {
@@ -145,9 +142,9 @@ public:
             }
 
 
-            if (hasMoreRequests) {
-                // to get here means there were more requests than available connections
-                // eventually the request queue will hit its cap and block the thread trying to add more.
+            if (!state.requests.empty()) {
+                // To get here means there were more requests than available connections, or more requests came in.
+                // Eventually the request queue will hit its cap and block the thread trying to add more.
                 goto drainQueue;
             } else {
                 std::lock_guard lk(state.mRequests);

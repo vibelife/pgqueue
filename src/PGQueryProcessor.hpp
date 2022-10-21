@@ -56,8 +56,8 @@ public:
             unsigned int nbQueriesPerConnection = 4,
             size_t maxQueueDepth = 128,
             size_t nbThreadsInResponseCallbackPool = 4
-        )
-        : state(maxQueueDepth), connString(connectionString), responseThreadPool(nbThreadsInResponseCallbackPool), nbConnectionsInPool(nbConnectionsInPool), nbQueriesPerConnection(nbQueriesPerConnection)
+    )
+            : state(maxQueueDepth), connString(connectionString), responseThreadPool(nbThreadsInResponseCallbackPool), nbConnectionsInPool(nbConnectionsInPool), nbQueriesPerConnection(nbQueriesPerConnection)
     {}
 
     ~PGQueryProcessor() {

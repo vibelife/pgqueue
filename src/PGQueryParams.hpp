@@ -14,6 +14,15 @@
 #include <parser/parse_type.h>
 #include "libs/rapidjson/writer.h"
 
+#include <vector>
+#include <cstring>
+#include <string>
+#include <postgres.h>
+#include <libpq-fe.h>
+#include <catalog/pg_type.h>
+#include <parser/parse_type.h>
+#include "libs/rapidjson/writer.h"
+
 template <typename T>
 concept toJson = requires (T const v) {
     {v.toSqlParam()} -> std::convertible_to<std::string>;

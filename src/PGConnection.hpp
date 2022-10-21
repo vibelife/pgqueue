@@ -59,7 +59,7 @@ private:
     }
 public:
     explicit PGConnection(unsigned nbMaxPending = 4)
-        :nbMaxPending(nbMaxPending)
+            :nbMaxPending(nbMaxPending)
     {}
 
     ~PGConnection() {
@@ -162,7 +162,16 @@ public:
             int res{};
             switch (request->queryParams->type) {
                 case PGQueryParams::PLAIN_QUERY:
-                    res = PQsendQuery(conn, request->queryParams->command);
+                    res = PQsendQueryParams(
+                            conn,
+                            request->queryParams->command,
+                            0,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            0
+                    );
                     break;
                 case PGQueryParams::QUERY_WITH_PARAMS:
                     res = PQsendQueryParams(
@@ -179,7 +188,7 @@ public:
             }
 
             if (res == 0) {
-                printError("PQsendQuery");
+                printError(PQerrorMessage(conn));
                 exit(EXIT_FAILURE);
             }
 

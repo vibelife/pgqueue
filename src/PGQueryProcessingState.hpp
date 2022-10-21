@@ -34,7 +34,7 @@ struct PGQueryProcessingState {
     rigtorp::MPMCQueue<PGQueryResponse*> responses;
 
     explicit PGQueryProcessingState(size_t queueDepths)
-        :requests(queueDepths), responses(queueDepths)
+            :requests(queueDepths), responses(queueDepths)
     {}
 
     void cleanUp() {
