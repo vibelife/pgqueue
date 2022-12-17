@@ -14,15 +14,6 @@
 #include <parser/parse_type.h>
 #include "libs/rapidjson/writer.h"
 
-#include <vector>
-#include <cstring>
-#include <string>
-#include <postgres.h>
-#include <libpq-fe.h>
-#include <catalog/pg_type.h>
-#include <parser/parse_type.h>
-#include "libs/rapidjson/writer.h"
-
 template <typename T>
 concept toJson = requires (T const v) {
     {v.toSqlParam()} -> std::convertible_to<std::string>;
@@ -35,7 +26,7 @@ concept writeJson = requires (T const v, rapidjson::Writer<rapidjson::StringBuff
 
 /**
  * To find the postgresql OID of any value execute the following query in posteges "SELECT pg_typeof(???)::oid"
- * replace ??? with the value you want the OID of, then look up the result in <catalog/pg_type.h>
+ * replaceDashWithUnderscore ??? with the value you want the OID of, then look up the result in <catalog/pg_type.h>
  * For example "SELECT pg_typeof(1)::oid" returns "23". When you search "23" in <catalog/pg_type.h> you will see
  * that is maps to "INT4OID".
  */
@@ -95,6 +86,10 @@ struct PGBigUInt: public PGParam {
 
 struct PGBigInt: public PGParam {
     explicit PGBigInt(long value): PGParam(INT8OID, std::move(std::to_string(value))) {}
+};
+
+struct PGBool: public PGParam {
+    explicit PGBool(bool value): PGParam(BOOLOID, std::move(std::to_string(value))) {}
 };
 
 struct PGInt: public PGParam {
@@ -195,6 +190,14 @@ public:
         }
 
         /**
+         * Returns an empty builder instance
+         * @return
+         */
+        static Builder create() {
+            return Builder{};
+        }
+
+        /**
          * Builds out all of the fields that need to be passed to [PQsendQueryParams]
          * @return
          */
@@ -228,6 +231,30 @@ public:
 
             // at this point the fields are ready to be passed to postgresql
             return managed;
+        }
+
+        /**
+         * Returns the number of parameters added so far
+         * @return
+         */
+        [[nodiscard]]
+        size_t getNbParams() const {
+            return this->params.size();
+        }
+
+        /**
+         * Sets the SQL
+         * @param sql
+         * @return
+         */
+        Builder& setSql(std::string const& sql) {
+            if (managed->command != nullptr) {
+                free(managed->command);
+            }
+
+            managed->command = static_cast<char*>(calloc(sql.size() + 1, sizeof(char)));
+            memmove((void*)managed->command, sql.c_str(), sql.size());
+            return *this;
         }
 
         /**
@@ -273,6 +300,16 @@ public:
         }
 
         /**
+         * Adds a varchar param
+         * @param value
+         * @return
+         */
+        Builder& addParam(std::string_view value) {
+            addParam(new PGVarchar{std::string(value)});
+            return *this;
+        }
+
+        /**
          * Adds a varchar param. This overload copies the string.
          * @param value
          * @return
@@ -299,6 +336,16 @@ public:
          */
         Builder& addParam(int value) {
             addParam(new PGInt{value});
+            return *this;
+        }
+
+        /**
+         * Adds an int param
+         * @param value
+         * @return
+         */
+        Builder& addParam(bool value) {
+            addParam(new PGBool{value});
             return *this;
         }
 

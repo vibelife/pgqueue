@@ -5,7 +5,6 @@
 #ifndef PGQUEUE_PGQUERYSTRUCTURES_HPP
 #define PGQUEUE_PGQUERYSTRUCTURES_HPP
 
-#include <iostream>
 #include <functional>
 #include <cstdio>
 #include <unordered_map>

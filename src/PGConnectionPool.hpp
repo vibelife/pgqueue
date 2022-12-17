@@ -10,7 +10,6 @@
 #include <condition_variable>
 #include <vector>
 #include <unordered_map>
-#include <liburing.h>
 #include <cstring>
 
 #include "MPMCQueue.hpp"
@@ -30,11 +29,11 @@ private:
     std::unordered_map<int, PGConnection*> connections{};
 private:
     static void printError(const char* errMsg, int err) {
-        std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
+        printf("[Error] %s: %s\n", errMsg, strerror(err));
     }
 
     static void printError(char const* msg) {
-        std::cerr << msg << std::endl << std::flush;
+        printf("%s\n", msg);
     }
 
     /**
@@ -55,7 +54,7 @@ private:
                 exit(EXIT_FAILURE);
             }
         }
-        std::cout << "Connection Pool: " << nbConnections << " connection(s) established" << "\n";
+        printf("Connection Pool: %i  connection(s) established\n", nbConnections);
     }
 public:
     ~PGConnectionPool() {

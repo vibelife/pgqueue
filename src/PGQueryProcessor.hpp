@@ -29,7 +29,7 @@ private:
     PGQueryProcessingState state;
 private:
     static void printError(const char* errMsg, int err) {
-        std::cerr << "[Error] " << errMsg << ": " << strerror(err) << "\n" << std::flush;
+        printf("[Error] %s: %s\n", errMsg, strerror(err));
     }
 
     /**
@@ -79,7 +79,7 @@ public:
     }
 
     /**
-     * Connects to the database, and stats the request processor in a background thread.
+     * Connects to the database, and starts the request processor in a background thread.
      */
     void go() {
         pool = new PGConnectionPool{};

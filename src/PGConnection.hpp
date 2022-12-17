@@ -8,10 +8,9 @@
 #include <libpq-fe.h>
 #include <atomic>
 #include <string>
-#include <iostream>
 #include <functional>
-#include <liburing.h>
 #include <queue>
+#include <sys/epoll.h>
 #include "PGQueryStructures.hpp"
 #include "PGQueryProcessingState.hpp"
 
@@ -37,7 +36,7 @@ private:
     unsigned nbMaxPending{4};
 private:
     static void printError(std::string const& msg) {
-        std::cerr << msg << "\n";
+        printf("%s\n", msg.c_str());
     }
 
     /**
@@ -121,7 +120,7 @@ public:
                     case PGRES_POLLING_OK:
                         pgfd = PQsocket(conn);
                         if (!PQenterPipelineMode(conn)) {
-                            std::cerr << "Could not enter pipeline mode: PQenterPipelineMode(...)\n";
+                            printError("Could not enter pipeline mode: PQenterPipelineMode(...)");
                             exit(EXIT_FAILURE);
                         }
                         retVal = PGConnectionResult::PGConnectionResult_Ok;
