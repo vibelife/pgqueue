@@ -59,7 +59,6 @@ private:
 public:
     ~PGConnectionPool() {
         close(epfd);
-        thrd.join();
         for (auto& p : connections) {
             delete p.second;
         }

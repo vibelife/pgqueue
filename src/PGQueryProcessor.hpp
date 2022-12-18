@@ -62,7 +62,6 @@ public:
 
     ~PGQueryProcessor() {
         state.cleanUp();
-        responseHandlerThread.join();
         delete pool;
     }
 
