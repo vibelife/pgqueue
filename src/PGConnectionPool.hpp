@@ -110,7 +110,7 @@ public:
 
         struct epoll_event events[NB_EVENTS];
 
-        while (state.isRunning) {
+        while (state.isRunning.test()) {
             // wait for another thread to alert us when a query is submitted
             std::unique_lock lock{state.mRequests};
             state.cvRequests.wait(lock, [&] { return state.requestsLockState; });

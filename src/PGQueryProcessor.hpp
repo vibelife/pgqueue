@@ -84,7 +84,7 @@ public:
         pool = new PGConnectionPool{};
         pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
         responseHandlerThread = std::jthread([&] {
-            while (state.isRunning) {
+            while (state.isRunning.test()) {
                 std::unique_lock lock{state.mResponses};
                 state.cvResponses.wait(lock, [&] { return state.responsesLockState; });
                 lock.unlock();
@@ -119,7 +119,7 @@ public:
      * @return
      */
     void push(std::string&& q, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        if (state.isRunning) {
+        if (state.isRunning.test()) {
             pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(std::move(q)).build(), std::move(callback)});
         }
     }
@@ -132,7 +132,7 @@ public:
      * @return
      */
     void push(char const* q, size_t nbChars, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        if (state.isRunning) {
+        if (state.isRunning.test()) {
             pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(q, nbChars).build(), std::move(callback)});
         }
     }
@@ -144,7 +144,7 @@ public:
      * @return
      */
     void push(PGQueryParams* queryParams, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        if (state.isRunning && queryParams != nullptr) {
+        if (state.isRunning.test() && queryParams != nullptr) {
             pushRequest(new PGQueryRequest{false, queryParams, std::move(callback)});
         }
     }

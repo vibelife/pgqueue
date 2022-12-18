@@ -19,7 +19,7 @@ struct PGQueryProcessingState {
         LockStates_KILL,
     };
 
-    std::atomic<bool> isRunning{true};
+    std::atomic_flag isRunning{true};
 
     std::condition_variable cvRequests{};
     std::mutex mRequests{};
@@ -40,7 +40,7 @@ struct PGQueryProcessingState {
     void cleanUp() {
         using namespace std::chrono_literals;
 
-        isRunning = false;
+        isRunning.clear();
         // clear up the requests
         while (!requests.empty()) {
             PGQueryRequest *ptr{};
