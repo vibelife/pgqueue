@@ -25,7 +25,7 @@ private:
     boost::asio::thread_pool responseThreadPool;
     unsigned int nbConnectionsInPool{};
     unsigned int nbQueriesPerConnection{};
-    std::thread responseHandlerThread;
+    std::jthread responseHandlerThread;
     PGQueryProcessingState state;
 private:
     static void printError(const char* errMsg, int err) {
@@ -84,7 +84,7 @@ public:
     void go() {
         pool = new PGConnectionPool{};
         pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
-        responseHandlerThread = std::thread([&] {
+        responseHandlerThread = std::jthread([&] {
             while (state.isRunning) {
                 std::unique_lock lock{state.mResponses};
                 state.cvResponses.wait(lock, [&] { return state.responsesLockState; });

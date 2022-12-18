@@ -24,7 +24,7 @@ private:
     static constexpr unsigned int NB_EVENTS = 2;
     static constexpr auto isReadyFn = [](auto const& p) { return p.second->isReady(); };
     static constexpr auto isDoneFn = [](auto const& p) { return p.second->isDone(); };
-    std::thread thrd;
+    std::jthread thrd;
     int epfd{};
     std::unordered_map<int, PGConnection*> connections{};
 private:
@@ -160,7 +160,7 @@ public:
      * @param state
      */
     void go(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, PGQueryProcessingState &state) {
-        thrd = std::thread([this, connectionString, nbConnections, nbQueriesPerConnection, &state] {
+        thrd = std::jthread([this, connectionString, nbConnections, nbQueriesPerConnection, &state] {
             epfd = epoll_create1(0);
             if (epfd < 0) {
                 printError("epoll_create1: ", epfd);
