@@ -3,6 +3,7 @@ project(pgqueue)
 
 set(CMAKE_CXX_STANDARD 20)
 set(Boost_NO_WARN_NEW_VERSIONS 1)
+set(BOOST_ROOT /usr/include/boost_1_81_0)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
 add_executable(${PROJECT_NAME}
@@ -25,7 +26,7 @@ find_package(Threads)
 link_libraries(${Threads})
 
 find_package(PostgreSQL)
-include_directories(/usr/include/postgresql/)
+include_directories(/usr/include/postgresql/current)
 
 
 target_link_libraries(${PROJECT_NAME} Boost::context PostgreSQL::PostgreSQL ${CMAKE_THREAD_LIBS_INIT})
