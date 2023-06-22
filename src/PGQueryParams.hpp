@@ -1,7 +1,3 @@
-//
-// Created by anewman on 2022-06-28.
-//
-
 #ifndef PGQUEUE_PGQUERYPARAMS_HPP
 #define PGQUEUE_PGQUERYPARAMS_HPP
 
@@ -78,6 +74,10 @@ struct PGJsonArray: public PGParam {
 
 struct PGVarchar: public PGParam {
     explicit PGVarchar(std::string&& value): PGParam(VARCHAROID, std::move(value)){}
+};
+
+struct PGFloat: public PGParam {
+    explicit PGFloat(double value): PGParam(FLOAT8OID, std::move(std::to_string(value))) {}
 };
 
 struct PGBigUInt: public PGParam {
@@ -173,7 +173,7 @@ public:
             auto retVal = Builder{};
             retVal.managed->command = static_cast<char*>(calloc(sql.size() + 1, sizeof(char)));
             memmove((void*)retVal.managed->command, sql.c_str(), sql.size());
-            // retVal.managed->command[sql.size()] = '\0';
+            // retVal.managed->command[sqlOp.size()] = '\0';
             return retVal;
         }
 
@@ -336,6 +336,16 @@ public:
          */
         Builder& addParam(int value) {
             addParam(new PGInt{value});
+            return *this;
+        }
+
+        /**
+         * Adds a double param
+         * @param value
+         * @return
+         */
+        Builder& addParam(double value) {
+            addParam(new PGFloat{value});
             return *this;
         }
 

@@ -1,7 +1,3 @@
-//
-// Created by anewman on 2022-06-29.
-//
-
 #ifndef PGQUEUE_PGCONNECTIONPOOL_HPP
 #define PGQUEUE_PGCONNECTIONPOOL_HPP
 
@@ -78,7 +74,7 @@ public:
     }
 
     /**
-     * Returns true if any connection is ready to process
+     * Returns true if any connection is ready to push
      * @return
      */
     bool hasReadyConnections() {
@@ -86,7 +82,7 @@ public:
     }
 
     /**
-     * Returns true if all connections are ready to process
+     * Returns true if all connections are ready to push
      * @return
      */
     bool isDone() {

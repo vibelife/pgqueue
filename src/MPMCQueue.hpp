@@ -1,7 +1,3 @@
-//
-// Created by anewman on 2022-01-22.
-//
-
 #ifndef UNTITLED3_MPMCQUEUE_HPP
 #define UNTITLED3_MPMCQUEUE_HPP
 

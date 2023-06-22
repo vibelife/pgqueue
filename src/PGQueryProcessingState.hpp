@@ -1,7 +1,3 @@
-//
-// Created by anewman on 2022-07-02.
-//
-
 #ifndef PGQUEUE_PGQUERYPROCESSINGSTATE_HPP
 #define PGQUEUE_PGQUERYPROCESSINGSTATE_HPP
 

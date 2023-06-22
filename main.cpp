@@ -8,7 +8,7 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t MAX_QUERIES = 170000;
+    static constexpr size_t MAX_QUERIES = 20;
     // std::latch latch{1};
     {
         auto p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 12, 16);

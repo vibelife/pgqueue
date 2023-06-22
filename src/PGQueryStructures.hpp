@@ -1,7 +1,3 @@
-//
-// Created by anewman on 2022-06-28.
-//
-
 #ifndef PGQUEUE_PGQUERYSTRUCTURES_HPP
 #define PGQUEUE_PGQUERYSTRUCTURES_HPP
 
