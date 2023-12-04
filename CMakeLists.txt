@@ -18,7 +18,6 @@ add_executable(${PROJECT_NAME}
     src/PGQueryProcessingState.hpp
 )
 
-find_package(PkgConfig REQUIRED)
 find_package(Boost REQUIRED COMPONENTS context system)
 link_libraries(${Boost_LIBRARIES})
 
