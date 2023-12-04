@@ -16,7 +16,7 @@
 
 class PGQueryProcessor {
 private:
-    PGConnectionPool* pool{};
+    PGConnectionPool pool{};
     char const* connString;
     boost::asio::thread_pool responseThreadPool;
     unsigned int nbConnectionsInPool{};
@@ -58,7 +58,6 @@ public:
 
     ~PGQueryProcessor() {
         state.cleanUp();
-        delete pool;
     }
 
     static PGQueryProcessor* createInstance(
@@ -77,8 +76,7 @@ public:
      * Connects to the database, and starts the request processor in a background thread.
      */
     void go() {
-        pool = new PGConnectionPool{};
-        pool->go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
+        pool.go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
         responseHandlerThread = std::jthread([&] {
             while (state.isRunning.test()) {
                 std::unique_lock lock{state.mResponses};
