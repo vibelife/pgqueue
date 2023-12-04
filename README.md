@@ -25,7 +25,7 @@ Here is some sample code...
 // connection strings can be a Unix Domain Socket for a performance boost
 PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=foo user=bar password=foobar");
 
-// this is the callback after each query is executed - also used for timing
+// this is the callback after each query is executed
 const auto callback = [&t, &count](PGResultSet&& resultSet) {
     for (PGRow& row : resultSet.rows) {
         std::cout << row.get("car") << std::endl;
