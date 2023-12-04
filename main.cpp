@@ -16,7 +16,7 @@ int main() {
         // - setting [nbConnectionsInPool] to the number of cores you have should give the best performance
         // - the more queries you send the more you should increase the [maxQueueDepth] parameter, otherwise
         //   you might clog the queue, then things get slow! The default number (128) will be more than enough in most cases.
-        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 12, 16);
+        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485");
 
         // used for timing
         const auto t = now();
