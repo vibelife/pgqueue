@@ -60,6 +60,17 @@ public:
         state.cleanUp();
     }
 
+    /**
+     * Returns a new instance of a query processor. In most applications the default parameter values are enough, so
+     * you'll only have to pass in the connection string, but if you need more performance start by increasing the 2nd param [nbConnectionsInPool], but
+     * don't increase it above the maximum number of connections to your PostgreSQL version.
+     * @param connectionString Can be a Unix Domain Socket for a boost in performance
+     * @param nbConnectionsInPool Should not exceed the max number of connections to your PostgreSQL install, also should not exceed the number of cores on your CPU.
+     * @param nbQueriesPerConnection Specifies how many queries that are concurrently sent over the same connection. The default param value will be enough in most cases.
+     * @param maxQueueDepth Specifies how many pending queries are allowed. The default param value will be enough in most cases.
+     * @param nbThreadsInResponseCallbackPool Specifies how many threads are used in the callback thread pool. The default param value will be enough in most cases.
+     * @return
+     */
     static PGQueryProcessor* createInstance(
             char const* connectionString,
             unsigned int nbConnectionsInPool = 4,
@@ -118,18 +129,18 @@ public:
         }
     }
 
-    /**
-     * Pushes a query onto the queue
-     * @param q - The SQL query
-     * @param nbChars - The length of the SQL query
-     * @param callback - If this is null it is like a fire-and-forget.
-     * @return
-     */
-    void push(char const* q, size_t nbChars, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        if (state.isRunning.test()) {
-            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(q, nbChars).build(), std::move(callback)});
-        }
-    }
+//    /**
+//     * Pushes a query onto the queue
+//     * @param q - The SQL query
+//     * @param nbChars - The length of the SQL query
+//     * @param callback - If this is null it is like a fire-and-forget.
+//     * @return
+//     */
+//    void push(char const* q, size_t nbChars, std::function<void(PGResultSet&&)>&& callback = nullptr) {
+//        if (state.isRunning.test()) {
+//            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(q, nbChars).build(), std::move(callback)});
+//        }
+//    }
 
     /**
      * Pushes a query onto the queue

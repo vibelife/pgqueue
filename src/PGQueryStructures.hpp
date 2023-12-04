@@ -22,6 +22,10 @@ public:
         std::swap(this->data, other.data);
     }
 
+    PGRow(PGRow const&other) noexcept = default;
+
+    PGRow& operator= (PGRow const&other) noexcept = default;
+
     /**
      * Returns true if the value is numeric
      * @param v
@@ -83,7 +87,11 @@ public:
         std::swap(errorMsg, other.errorMsg);
         std::swap(rows, other.rows);
     }
-};
+
+    PGResultSet(PGResultSet const&other) noexcept {
+        errorMsg = other.errorMsg;
+        std::copy(other.rows.begin(), other.rows.end(), rows.begin());
+    }};
 
 static constexpr auto NOOP = [](auto){};
 

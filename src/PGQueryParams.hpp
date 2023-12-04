@@ -74,6 +74,7 @@ struct PGJsonArray: public PGParam {
 
 struct PGVarchar: public PGParam {
     explicit PGVarchar(std::string&& value): PGParam(VARCHAROID, std::move(value)){}
+    explicit PGVarchar(char const* value): PGParam(VARCHAROID, value){}
 };
 
 struct PGFloat: public PGParam {
@@ -111,7 +112,7 @@ public:
 public:
     QueryType type = PLAIN_QUERY;
 
-    char* command = nullptr;
+    std::string command;
     /**
      * The number of parameters supplied; it is the length of the arrays
      * paramTypes[], paramValues[], paramLengths[], and paramFormats[].
@@ -136,13 +137,13 @@ public:
      * Specifies the actual data lengths of binary-format parameters. It is ignored for null
      * parameters and text-format parameters. The array pointer can be null when there are no binary parameters.
      */
-    const int* paramLengths = nullptr;
+    int* paramLengths = nullptr;
     /**
      * Specifies whether parameters are text (put a zero in the array entry for the corresponding
      * parameter) or binary (put a one in the array entry for the corresponding parameter).
      * If the array pointer is null then all parameters are presumed to be text strings.
      */
-    const int* paramFormats = nullptr;
+    int* paramFormats = nullptr;
     /**
      * Specify zero to obtain results in text format, or one to obtain results in binary format.
      * (There is not currently a provision to obtain different result columns in different
@@ -151,17 +152,21 @@ public:
     int resultFormat{};
 public:
     ~PGQueryParams() {
-        free(command);
-        free((void*) paramTypes);
-        free((void*) paramLengths);
-        free((void*) paramFormats);
-
-        // free each value
-        for (int i = 0; i < nParams; i += 1) {
-            free((void*) paramValues[i]);
+        if (paramTypes != nullptr) {
+            free(paramTypes);
         }
-        // free the array itself
-        free((void*) paramValues);
+
+        if (paramLengths != nullptr) {
+            free(paramLengths);
+        }
+
+        if (paramFormats != nullptr) {
+            free(paramFormats);
+        }
+
+        if (paramValues != nullptr) {
+            free(paramValues);
+        }
     }
 
     class Builder {
@@ -171,19 +176,7 @@ public:
     public:
         static Builder create(std::string&& sql) {
             auto retVal = Builder{};
-            retVal.managed->command = static_cast<char*>(calloc(sql.size() + 1, sizeof(char)));
-            memmove((void*)retVal.managed->command, sql.c_str(), sql.size());
-            return retVal;
-        }
-
-        static Builder create(char const* sql) {
-            return create(sql, strlen(sql));
-        }
-
-        static Builder create(char const* sql, size_t sqlLength) {
-            Builder retVal{};
-            retVal.managed->command = static_cast<char*>(calloc(sqlLength + 1, sizeof(char)));
-            memmove((void*)retVal.managed->command, sql, sqlLength);
+            retVal.managed->command = std::move(sql);
             return retVal;
         }
 
@@ -210,15 +203,13 @@ public:
 
             size_t paramTypeIndex{};
             for (PGParam* param: params) {
-                nbBytes += (sizeof(char) * param->value.size()) + 1;
                 managed->paramTypes[paramTypeIndex++] = param->oid;
             }
 
-            managed->paramValues = static_cast<char**>(calloc(managed->nParams, CHAR_PTR_SIZE));
+            managed->paramValues = static_cast<char**>(malloc(managed->nParams * CHAR_PTR_SIZE));
             size_t paramValueIndex{};
-            for (PGParam const* const param: params) {
-                managed->paramValues[paramValueIndex] = static_cast<char*>(calloc(param->value.size() + 1, CHAR_PTR_SIZE));
-                memmove(managed->paramValues[paramValueIndex++], param->value.c_str(), param->value.size());
+            for (PGParam* param: params) {
+                managed->paramValues[paramValueIndex++] = std::move(param->value).data();
             }
 
             // delete/clear all the params
@@ -245,13 +236,8 @@ public:
          * @param sql
          * @return
          */
-        Builder& setSql(std::string const& sql) {
-            if (managed->command != nullptr) {
-                free(managed->command);
-            }
-
-            managed->command = static_cast<char*>(calloc(sql.size() + 1, sizeof(char)));
-            memmove((void*)managed->command, sql.c_str(), sql.size());
+        Builder& setSql(std::string &&sql) {
+            managed->command = std::move(sql);
             return *this;
         }
 
@@ -313,7 +299,7 @@ public:
          * @return
          */
         Builder& addParam(char const* value) {
-            addParam(std::string_view{value});
+            addParam(new PGVarchar{value});
             return *this;
         }
 

@@ -8,15 +8,12 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t NB_QUERIES_TO_RUN = 1; /* increase this number until the time is 1.0 seconds */
+    static constexpr size_t NB_QUERIES_TO_RUN = 244000; /* increase this number until the time is 1.0 seconds */
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
         // - destructing the instance will disconnect from the database
-        // - setting [nbConnectionsInPool] to the number of cores you have should give the best performance
-        // - the more queries you send the more you should increase the [maxQueueDepth] parameter, otherwise
-        //   you might clog the queue, then things get slow! The default number (128) will be more than enough in most cases.
-        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485");
+        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 19);
 
         // used for timing
         const auto t = now();

@@ -122,7 +122,7 @@ public:
                         retVal = PGConnectionResult::PGConnectionResult_Ok;
                         break;
                     case PGRES_POLLING_FAILED:
-                        printError("Could not connectAllURing to the database. Check the connection string.");
+                        printError("Could not connect to the database. Check the connection string.");
                         retVal = PGConnectionResult::PGConnectionResult_Failed;
                         break;
                     default:
@@ -159,7 +159,7 @@ public:
                 case PGQueryParams::PLAIN_QUERY:
                     res = PQsendQueryParams(
                             conn,
-                            request->queryParams->command,
+                            request->queryParams->command.c_str(),
                             0,
                             nullptr,
                             nullptr,
@@ -171,7 +171,7 @@ public:
                 case PGQueryParams::QUERY_WITH_PARAMS:
                     res = PQsendQueryParams(
                             conn,
-                            request->queryParams->command,
+                            request->queryParams->command.c_str(),
                             request->queryParams->nParams,
                             request->queryParams->paramTypes,
                             request->queryParams->paramValues,
