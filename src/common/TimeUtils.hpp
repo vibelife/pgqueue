@@ -51,7 +51,7 @@ static void printElapsed(struct timespec const& startTime, const char* text = ""
     struct timespec t2{};
     clock_gettime(CLOCK_REALTIME, &t2);
     struct timespec td = getTimeSpec(startTime, t2);
-    printf("%s - %d.%.9ld\n", text, (int)td.tv_sec, td.tv_nsec);
+    printf("%s - %d.%.9ld seconds\n", text, (int)td.tv_sec, td.tv_nsec);
 }
 
 #endif //PGQUEUE_TIMEUTILS_HPP
