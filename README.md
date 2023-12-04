@@ -26,7 +26,7 @@ Here is some sample code...
 PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=foo user=bar password=foobar");
 
 // this is the callback after each query is executed
-const auto callback = [&t, &count](PGResultSet&& resultSet) {
+const auto callback = [](PGResultSet&& resultSet) {
     for (PGRow& row : resultSet.rows) {
         std::cout << row.get("car") << std::endl;
     }
