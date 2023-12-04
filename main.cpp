@@ -8,7 +8,7 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t NB_QUERIES_TO_RUN = 20; /* increase this number until the time is 1.0 seconds */
+    static constexpr size_t NB_QUERIES_TO_RUN = 1; /* increase this number until the time is 1.0 seconds */
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
@@ -24,8 +24,7 @@ int main() {
         std::atomic<int> count{0};
         // this is the callback after each query is executed - also used for timing
         const auto cb = [&t, &count](PGResultSet&& resultSet) {
-            // resultSet.rows.size();
-            if (++count == NB_QUERIES_TO_RUN - 1) {
+            if (++count == NB_QUERIES_TO_RUN) {
                 printElapsed(t);
             }
         };

@@ -303,7 +303,17 @@ public:
          * @return
          */
         Builder& addParam(std::string_view value) {
-            addParam(new PGVarchar{std::string(value)});
+            addParam(new PGVarchar{std::string{value}});
+            return *this;
+        }
+
+        /**
+         * Adds a varchar param
+         * @param value
+         * @return
+         */
+        Builder& addParam(char const* value) {
+            addParam(std::string_view{value});
             return *this;
         }
 
@@ -348,7 +358,7 @@ public:
         }
 
         /**
-         * Adds an int param
+         * Adds a bool param
          * @param value
          * @return
          */
