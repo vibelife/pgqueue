@@ -61,7 +61,7 @@ PGQueryProcessor::createInstance("...", 12, 16);
 
 Results #1: 160,000 - 165,000 queries per second (complete query round trips that return no rows, and the callback is called)
 
-Results #1: 138,000 - 140,000 queries per second (complete query round trips that return a single row from a user table, and the callback is called)
+Results #2: 138,000 - 140,000 queries per second (complete query round trips that return a single row from a user table, and the callback is called)
 
 
 
