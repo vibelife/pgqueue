@@ -129,19 +129,6 @@ public:
         }
     }
 
-//    /**
-//     * Pushes a query onto the queue
-//     * @param q - The SQL query
-//     * @param nbChars - The length of the SQL query
-//     * @param callback - If this is null it is like a fire-and-forget.
-//     * @return
-//     */
-//    void push(char const* q, size_t nbChars, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-//        if (state.isRunning.test()) {
-//            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(q, nbChars).build(), std::move(callback)});
-//        }
-//    }
-
     /**
      * Pushes a query onto the queue
      * @param queryParams - The SQL query params

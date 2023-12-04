@@ -8,7 +8,7 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t NB_QUERIES_TO_RUN = 244000; /* increase this number until the time is 1.0 seconds */
+    static constexpr size_t NB_QUERIES_TO_RUN = 1; /* increase this number until the time is 1.0 seconds */
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
