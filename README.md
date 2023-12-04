@@ -39,6 +39,8 @@ p->push(
   callback
 );
 
+std::this_thread::sleep_for(1s);
+
 delete p;
 ```
 
