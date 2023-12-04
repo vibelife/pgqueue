@@ -12,9 +12,10 @@ int main() {
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
+        // - destructing the instance will disconnect from the database
         // - setting [nbConnectionsInPool] to the number of cores you have should give the best performance
         // - the more queries you send the more you should increase the [maxQueueDepth] parameter, otherwise
-        //   you might clog the queue, then things get slow. The default number (128) will be enough in most cases.
+        //   you might clog the queue, then things get slow! The default number (128) will be more than enough in most cases.
         PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 12, 16);
 
         // used for timing

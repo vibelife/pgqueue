@@ -173,7 +173,6 @@ public:
             auto retVal = Builder{};
             retVal.managed->command = static_cast<char*>(calloc(sql.size() + 1, sizeof(char)));
             memmove((void*)retVal.managed->command, sql.c_str(), sql.size());
-            // retVal.managed->command[sqlOp.size()] = '\0';
             return retVal;
         }
 
@@ -181,11 +180,10 @@ public:
             return create(sql, strlen(sql));
         }
 
-        static Builder create(char const* sql, size_t nbChars) {
+        static Builder create(char const* sql, size_t sqlLength) {
             Builder retVal{};
-            retVal.managed->command = static_cast<char*>(calloc(nbChars + 1, sizeof(char)));
-            memmove((void*)retVal.managed->command, sql, nbChars);
-            // retVal.managed->command[nbChars] = '\0';
+            retVal.managed->command = static_cast<char*>(calloc(sqlLength + 1, sizeof(char)));
+            memmove((void*)retVal.managed->command, sql, sqlLength);
             return retVal;
         }
 
