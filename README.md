@@ -33,7 +33,7 @@ const auto callback = [](PGResultSet&& resultSet) {
 };
 
 p->push(
-  PGQueryParams::Builder::create("select car from bar where car=$1")
+  PGQueryParams::Builder::create("select * from bar where car=$1")
     .addParam("jaguar")
     .build(),
   callback
