@@ -44,10 +44,7 @@ std::this_thread::sleep_for(1s);
 delete p;
 ```
 
-# Performance
-
-
-Test 1:
+## Performance Test 1:
 
 - Intel Core i9-12900KF 64GB RAM
 - Ubuntu 22.04
@@ -63,5 +60,23 @@ Results #1: **160,000 - 165,000** queries per second (complete query round trips
 
 Results #2: **138,000 - 140,000** queries per second (complete query round trips that return a single row from a user table, and the callback is called)
 
+More details: TODO
 
+
+## Performance Test 2:
+
+- Intel Xeon E-2136 @ 3.30GHz 32GB RAM
+- Ubuntu 22.04
+- PostgreSQL 15
+- createInstance(...) code below
+```
+// connection pool size = 6
+// queries per connection = 8
+PGQueryProcessor::createInstance("...", 6, 8);
+```
+Results #1: TODO
+
+Results #2: TODO
+
+More details: TODO
 
