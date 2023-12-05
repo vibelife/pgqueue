@@ -1,5 +1,5 @@
 # pgqueue
-High performance C++ PostgreSQL database connector (only tested in Ubuntu and Ubuntu server!)
+High performance C++ PostgreSQL database driver (only tested in Ubuntu and Ubuntu server!)
 
 **currently only supports running SQL queries!**
 
