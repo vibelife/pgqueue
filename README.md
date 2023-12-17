@@ -55,7 +55,7 @@ delete p;
 PGQueryProcessor::createInstance("...", 19);
 ```
 
-Results #1: **244,000 - 246,000** queries per second (complete query round trips that return a single row from a user table, and the callback is called)
+Results #1: **228,000 - 231,000** queries per second (complete query round trips that return a single row from a user table, and the callback is called)
 
 More details: TODO
 
