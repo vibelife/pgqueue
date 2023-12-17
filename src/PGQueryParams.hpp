@@ -165,7 +165,12 @@ public:
         }
 
         if (paramValues != nullptr) {
-            free(paramValues);
+            // free each value
+            for (int i = 0; i < nParams; i += 1) {
+                free((void*) paramValues[i]);
+            }
+            // free the array itself
+            free((void*) paramValues);
         }
     }
 
@@ -209,7 +214,8 @@ public:
             managed->paramValues = static_cast<char**>(malloc(managed->nParams * CHAR_PTR_SIZE));
             size_t paramValueIndex{};
             for (PGParam* param: params) {
-                managed->paramValues[paramValueIndex++] = std::move(param->value).data();
+                managed->paramValues[paramValueIndex] = static_cast<char*>(calloc(param->value.size() + 1, CHAR_PTR_SIZE));
+                memmove(managed->paramValues[paramValueIndex++], param->value.c_str(), param->value.size());
             }
 
             // delete/clear all the params
