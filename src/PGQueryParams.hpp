@@ -10,6 +10,10 @@
 #include <parser/parse_type.h>
 #include "libs/rapidjson/writer.h"
 
+#undef vsnprintf
+#undef snprintf
+#undef strerror_r
+
 template <typename T>
 concept toJson = requires (T const v) {
     {v.toSqlParam()} -> std::convertible_to<std::string>;
@@ -101,7 +105,7 @@ struct PGUInt: public PGParam {
 
 class PGQueryParams {
 public:
-#define PGQBuilder(x) PGQueryParams::Builder::create(x)
+#define PGQBuilder(x) PGQueryParams::createBuilder(x)
 
     enum QueryType: int {
         PLAIN_QUERY,
@@ -365,6 +369,10 @@ public:
 
     static PGQueryParams::Builder<> createBuilder(std::string &&sql) {
         return PGQueryParams::Builder<PGQueryParams>::create(std::move(sql));
+    };
+
+    static PGQueryParams::Builder<> createBuilder() {
+        return PGQueryParams::Builder<PGQueryParams>::create();
     };
 };
 
