@@ -82,7 +82,7 @@ public:
     void go() {
         pool.go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
         responseHandlerThread = std::jthread([&] {
-            while (state.isRunning.test()) {
+            while (state.isRunning.test() || !state.requests.empty() || !state.responses.empty()) {
                 state.aResponses.wait(false);
 
                  while (!state.responses.empty()) {

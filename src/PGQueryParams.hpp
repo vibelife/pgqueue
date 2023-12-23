@@ -363,12 +363,12 @@ public:
         }
     };
 
-    static PGQueryParams::Builder<PGQueryParams> createBuilder(std::string &&sql) {
+    static PGQueryParams::Builder<> createBuilder(std::string &&sql) {
         return PGQueryParams::Builder<PGQueryParams>::create(std::move(sql));
     };
 };
 
-static PGQueryParams::Builder<PGQueryParams> q(std::string&& sql) {
+static PGQueryParams::Builder<> q(std::string&& sql) {
     return PGQueryParams::Builder<PGQueryParams>::create(std::move(sql));
 };
 

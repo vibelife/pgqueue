@@ -100,7 +100,7 @@ public:
 
         struct epoll_event events[NB_EVENTS];
 
-        while (state.isRunning.test()) {
+        while (state.isRunning.test() || !state.requests.empty()) {
             // wait for another thread to alert us when a query is submitted
             state.aRequests.wait(false);
 
@@ -157,7 +157,6 @@ public:
         });
 
         using namespace std::chrono_literals;
-        std::this_thread::sleep_for(1s);
     }
 };
 

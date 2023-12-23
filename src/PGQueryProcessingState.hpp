@@ -23,24 +23,33 @@ struct PGQueryProcessingState {
 
     void cleanUp() {
         using namespace std::chrono_literals;
-
-        isRunning.clear();
         // clear up the requests
         while (!requests.empty()) {
-            PGQueryRequest ptr;
-            requests.pop(ptr);
+            while (!requests.empty()) {
+                // printf("Clearing out [requests.size() = %li]\n", requests.size());
+                std::this_thread::sleep_for(100ms);
+                aRequests.test_and_set();
+                aRequests.notify_one();
+            }
         }
+
+
+        if (!responses.empty()) {
+            while (!responses.empty()) {
+                // printf("Clearing out [responses.size() = %li]\n", responses.size());
+                std::this_thread::sleep_for(100ms);
+                aResponses.test_and_set();
+                aResponses.notify_one();
+            }
+        }
+
+        isRunning.clear();
 
         // this will force the background wait loops to exit
         aRequests.test_and_set();
         aRequests.notify_one();
         aResponses.test_and_set();
         aResponses.notify_one();
-
-        while (!requests.empty() && !responses.empty()) {
-            printf("Clearing out [requests.size() = %li] [responses.size() = %li]\n", requests.size(), responses.size());
-            std::this_thread::sleep_for(100ms);
-        }
     }
 };
 

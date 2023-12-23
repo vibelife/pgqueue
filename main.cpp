@@ -7,27 +7,26 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t NB_QUERIES_TO_RUN = 163000; /* increase this number until the time is 1.0 seconds */
+    static constexpr size_t NB_QUERIES_TO_RUN = 177000; /* increase this number until the time is 1.0 seconds */
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
         // - destructing the instance will disconnect from the database
-        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 32, 16, NB_QUERIES_TO_RUN, 8);
+        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 32, 32, 178000, 2);
+
+        // wait for connection pool to connect, then we start timing.
+        std::this_thread::sleep_for(500ms);
 
         // used for timing
         const auto t = now();
         // used for timing
         std::atomic<int> count{0};
-        // int count{0};
         // this is the callback after each query is executed - also used for timing
         const auto cb = [&t, &count](PGResultSet&& resultSet) {
             if (++count == NB_QUERIES_TO_RUN) {
                 printElapsed(t, "after callback");
             }
-            // std::cout << resultSet.rows.front().get("session_id") << std::endl;
         };
-
-
 
         // send each query to the database in a tight loop
         for (int i{}; i < NB_QUERIES_TO_RUN; i += 1) {
@@ -38,9 +37,6 @@ int main() {
                     cb
             );
         }
-        // printElapsed(t, "after pushes");
-
-        std::this_thread::sleep_for(1s);
 
         // when you destruct a [PGQueryProcessor] it will wait until the currently running queries are done first
         delete p;

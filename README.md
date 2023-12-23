@@ -51,11 +51,14 @@ delete p;
 - PostgreSQL 15
 - createInstance(...) code below
 ```
-// connection pool size = 19
-PGQueryProcessor::createInstance("...", 19);
+// connection pool size         = 32
+// queries per connection       = 32
+// query queue size             = 178000
+// response thread pool size    = 2
+PGQueryProcessor::createInstance("...", 32, 32, 178000, 2);
 ```
 
-Results #1: **161,000 - 164,000** queries per second (complete query round trips that return a single row from a user table, and the callback is called)
+Results #1: **175,000 - 177,000** queries per second (complete query round trips that return a single row from a user table, and the callback is called)
 
 More details: TODO
 
