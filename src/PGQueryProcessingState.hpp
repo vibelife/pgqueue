@@ -9,25 +9,13 @@
 #include "PGQueryStructures.hpp"
 
 struct PGQueryProcessingState {
-    enum LockStates {
-        LockStates_WAIT = 0,
-        LockStates_GO,
-        LockStates_KILL,
-    };
-
     std::atomic_flag isRunning{true};
 
-    std::condition_variable cvRequests{};
-    std::mutex mRequests{};
-    // bool hasRequestsToProcess{false};
-    LockStates requestsLockState{LockStates_WAIT};
     rigtorp::MPMCQueue<PGQueryRequest> requests;
+    std::atomic_flag aRequests;
 
-    std::condition_variable cvResponses{};
-    std::mutex mResponses{};
-    // bool hasResponsesToProcess{false};
-    LockStates responsesLockState{LockStates_WAIT};
     rigtorp::MPMCQueue<PGQueryResponse> responses;
+    std::atomic_flag aResponses;
 
     explicit PGQueryProcessingState(size_t queueDepths)
             :requests(queueDepths), responses(queueDepths)
@@ -43,17 +31,11 @@ struct PGQueryProcessingState {
             requests.pop(ptr);
         }
 
-        {
-            std::lock_guard lk{mRequests};
-            requestsLockState = LockStates_KILL;
-        }
-        cvRequests.notify_one();
-
-        {
-            std::lock_guard lk{mResponses};
-            responsesLockState = LockStates_KILL;
-        }
-        cvResponses.notify_one();
+        // this will force the background wait loops to exit
+        aRequests.test_and_set();
+        aRequests.notify_one();
+        aResponses.test_and_set();
+        aResponses.notify_one();
 
         while (!requests.empty() && !responses.empty()) {
             printf("Clearing out [requests.size() = %li] [responses.size() = %li]\n", requests.size(), responses.size());

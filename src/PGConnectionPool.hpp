@@ -92,11 +92,7 @@ public:
      * @param connectionString
      * @param nbConnections
      * @param nbQueriesPerConnection
-     * @param hasRequestsToProcess
-     * @param m
-     * @param cvRequests
-     * @param requests
-     * @param responses
+     * @param state
      */
     void runWithEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection, PGQueryProcessingState &state) {
         // create multiple connections to the database
@@ -106,9 +102,7 @@ public:
 
         while (state.isRunning.test()) {
             // wait for another thread to alert us when a query is submitted
-            std::unique_lock lock{state.mRequests};
-            state.cvRequests.wait(lock, [&] { return state.requestsLockState; });
-            lock.unlock();
+            state.aRequests.wait(false);
 
             drainQueue:
             // Drain the queue as much as we can
@@ -139,8 +133,7 @@ public:
                 // Eventually the request queue will hit its cap and block the thread trying to add more.
                 goto drainQueue;
             } else {
-                std::lock_guard lk(state.mRequests);
-                state.requestsLockState = PGQueryProcessingState::LockStates_WAIT;
+                state.aRequests.clear();
             }
         }
     }
@@ -162,6 +155,9 @@ public:
 
             runWithEPoll(connectionString, nbConnections, nbQueriesPerConnection, state);
         });
+
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1s);
     }
 };
 

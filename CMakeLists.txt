@@ -15,7 +15,7 @@ add_executable(${PROJECT_NAME}
     src/PGConnection.hpp
     src/PGConnectionPool.hpp
     src/common/TimeUtils.hpp
-    src/PGQueryProcessingState.hpp)
+    src/PGQueryProcessingState.hpp src/Consts.hpp)
 
 find_package(Boost REQUIRED COMPONENTS context system)
 link_libraries(${Boost_LIBRARIES})

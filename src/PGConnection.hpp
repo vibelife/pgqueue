@@ -280,16 +280,8 @@ public:
                 }
             }
 
-
-            {
-                std::lock_guard lk(state.mResponses);
-                if (state.responsesLockState == PGQueryProcessingState::LockStates_GO) {
-                    return;
-                }
-
-                state.responsesLockState = PGQueryProcessingState::LockStates_GO;
-            }
-            state.cvResponses.notify_one();
+            state.aResponses.test_and_set();
+            state.aResponses.notify_one();
         }
     }
 

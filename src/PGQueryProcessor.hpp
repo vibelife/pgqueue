@@ -35,15 +35,8 @@ private:
     void pushRequest(PGQueryRequest &&request) {
         state.requests.emplace(std::move(request));
 
-        {
-            std::lock_guard lk(state.mRequests);
-            if (state.requestsLockState == PGQueryProcessingState::LockStates_GO) {
-                return;
-            }
-
-            state.requestsLockState = PGQueryProcessingState::LockStates_GO;
-        }
-        state.cvRequests.notify_one();
+        state.aRequests.test_and_set();
+        state.aRequests.notify_one();
     }
 public:
     explicit PGQueryProcessor(
@@ -90,11 +83,9 @@ public:
         pool.go(connString, nbConnectionsInPool, nbQueriesPerConnection, state);
         responseHandlerThread = std::jthread([&] {
             while (state.isRunning.test()) {
-                std::unique_lock lock{state.mResponses};
-                state.cvResponses.wait(lock, [&] { return state.responsesLockState; });
-                lock.unlock();
+                state.aResponses.wait(false);
 
-                while (!state.responses.empty()) {
+                 while (!state.responses.empty()) {
                     PGQueryResponse response;
                     state.responses.pop(response);
                     auto cb = std::move(response.callback);
@@ -106,12 +97,9 @@ public:
                             cb(std::move(resultSet));
                         });
                     }
-                }
+                 }
 
-                {
-                    std::lock_guard lk(state.mResponses);
-                    state.responsesLockState = PGQueryProcessingState::LockStates_WAIT;
-                }
+                state.aResponses.clear();
             }
         });
     }
