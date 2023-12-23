@@ -88,6 +88,12 @@ public:
         std::swap(rows, other.rows);
     }
 
+    PGResultSet& operator=(PGResultSet &&other) noexcept {
+        std::swap(errorMsg, other.errorMsg);
+        std::swap(rows, other.rows);
+        return *this;
+    }
+
     PGResultSet(PGResultSet const&other) noexcept {
         errorMsg = other.errorMsg;
         std::copy(other.rows.begin(), other.rows.end(), rows.begin());
@@ -96,26 +102,40 @@ public:
 static constexpr auto NOOP = [](auto){};
 
 struct PGQueryResponse {
-    static PGQueryResponse* poison() {
-        return new PGQueryResponse{true};
+    PGQueryResponse() = default;
+    PGQueryResponse(PGQueryResponse &&other)  noexcept {
+        std::swap(this->resultSet, other.resultSet);
+        std::swap(this->callback, other.callback);
+    }
+    PGQueryResponse& operator=(PGQueryResponse &&other)  noexcept {
+        std::swap(this->resultSet, other.resultSet);
+        std::swap(this->callback, other.callback);
+        return *this;
     }
 
-    bool isPoison{};
     PGResultSet resultSet{};
     std::function<void(PGResultSet&&)> callback = NOOP;
 };
 
 struct PGQueryRequest {
-    ~PGQueryRequest() {
-        delete queryParams;
+    PGQueryRequest() = default;
+    PGQueryRequest(PGQueryParams &&queryParams, std::function<void(PGResultSet&&)> &&callback)
+        : callback(std::move(callback)) {
+        std::swap(this->queryParams, queryParams);
     }
 
-    static PGQueryRequest* poison() {
-        return new PGQueryRequest{true};
+    PGQueryRequest(PGQueryRequest &&other)  noexcept {
+        std::swap(this->queryParams, other.queryParams);
+        std::swap(this->callback, other.callback);
     }
 
-    bool isPoison{};
-    PGQueryParams* queryParams{nullptr};
+    PGQueryRequest& operator=(PGQueryRequest &&other)  noexcept {
+        std::swap(this->queryParams, other.queryParams);
+        std::swap(this->callback, other.callback);
+        return *this;
+    }
+
+    PGQueryParams queryParams{};
     std::function<void(PGResultSet&&)> callback{nullptr};
 };
 

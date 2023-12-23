@@ -67,9 +67,7 @@ struct PGJsonArray: public PGParam {
         this->value.append(buffer.GetString());
     }
 
-    explicit PGJsonArray(std::string&& value): PGParam(JSONOID) {
-        this->value.swap(value);
-    }
+    explicit PGJsonArray(std::string&& value): PGParam(JSONOID, std::move(value)) {}
 };
 
 struct PGVarchar: public PGParam {
@@ -112,7 +110,7 @@ public:
 public:
     QueryType type = PLAIN_QUERY;
 
-    std::string command;
+    std::string command{};
     /**
      * The number of parameters supplied; it is the length of the arrays
      * paramTypes[], paramValues[], paramLengths[], and paramFormats[].
@@ -167,21 +165,22 @@ public:
         if (paramValues != nullptr) {
             // free each value
             for (int i = 0; i < nParams; i += 1) {
-                free((void*) paramValues[i]);
+                free(paramValues[i]);
             }
             // free the array itself
-            free((void*) paramValues);
+            free(paramValues);
         }
     }
 
+    template<class PGQueryParams_T = PGQueryParams>
     class Builder {
     private:
-        PGQueryParams* managed = new PGQueryParams{};
-        std::vector<PGParam*> params{};
+        PGQueryParams_T managed{};
+        std::vector<PGParam> params{};
     public:
-        static Builder create(std::string&& sql) {
-            auto retVal = Builder{};
-            retVal.managed->command = std::move(sql);
+        static Builder<PGQueryParams> create(std::string&& sql) {
+            auto retVal = Builder<PGQueryParams>{};
+            retVal.managed.command = std::move(sql);
             return retVal;
         }
 
@@ -197,35 +196,24 @@ public:
          * Builds out all of the fields that need to be passed to [PQsendQueryParams]
          * @return
          */
-        PGQueryParams* build() {
+        PGQueryParams&& build() {
             static constexpr auto OID_SIZE = sizeof(Oid);
             static constexpr auto CHAR_PTR_SIZE = sizeof(char*);
 
-            managed->nParams = (int)params.size();
-            managed->paramTypes = static_cast<Oid*>(calloc((int)params.size(), OID_SIZE));
+            managed.nParams = static_cast<int>(params.size());
+            managed.paramTypes = static_cast<Oid*>(calloc((int)params.size(), OID_SIZE));
 
-            size_t nbBytes{};
 
+            managed.paramValues = static_cast<char**>(malloc(params.size() * CHAR_PTR_SIZE));
             size_t paramTypeIndex{};
-            for (PGParam* param: params) {
-                managed->paramTypes[paramTypeIndex++] = param->oid;
+            for (PGParam const& param: params) {
+                managed.paramTypes[paramTypeIndex] = param.oid;
+                managed.paramValues[paramTypeIndex] = static_cast<char*>(calloc(param.value.size() + 1, CHAR_PTR_SIZE));
+                memmove(managed.paramValues[paramTypeIndex++], param.value.c_str(), param.value.size());
             }
-
-            managed->paramValues = static_cast<char**>(malloc(managed->nParams * CHAR_PTR_SIZE));
-            size_t paramValueIndex{};
-            for (PGParam* param: params) {
-                managed->paramValues[paramValueIndex] = static_cast<char*>(calloc(param->value.size() + 1, CHAR_PTR_SIZE));
-                memmove(managed->paramValues[paramValueIndex++], param->value.c_str(), param->value.size());
-            }
-
-            // delete/clear all the params
-            for (PGParam* param: params) {
-                delete param;
-            }
-            params.clear();
 
             // at this point the fields are ready to be passed to postgresql
-            return managed;
+            return std::move(managed);
         }
 
         /**
@@ -243,7 +231,7 @@ public:
          * @return
          */
         Builder& setSql(std::string &&sql) {
-            managed->command = std::move(sql);
+            managed.command = std::move(sql);
             return *this;
         }
 
@@ -254,7 +242,7 @@ public:
          */
         template <typename T>
         Builder& addJsonArrayParam(std::vector<T>&& value) requires toJson<T> {
-            addParam(new PGJsonArray{std::move(value)});
+            addParam(PGJsonArray{std::move(value)});
             return *this;
         }
 
@@ -265,7 +253,7 @@ public:
          */
         template <typename T>
         Builder& addJsonArrayParam(std::vector<T>&& value) requires writeJson<T> {
-            addParam(new PGJsonArray{std::move(value)});
+            addParam(PGJsonArray{std::move(value)});
             return *this;
         }
 
@@ -275,7 +263,7 @@ public:
          * @return
          */
         Builder& addJsonArrayParam(std::string&& value) {
-            addParam(new PGJsonArray{std::move(value)});
+            addParam(PGJsonArray{std::move(value)});
             return *this;
         }
 
@@ -285,7 +273,7 @@ public:
          * @return
          */
         Builder& addParam(std::string&& value) {
-            addParam(new PGVarchar{std::move(value)});
+            addParam(PGVarchar{std::move(value)});
             return *this;
         }
 
@@ -295,7 +283,7 @@ public:
          * @return
          */
         Builder& addParam(std::string_view value) {
-            addParam(new PGVarchar{std::string{value}});
+            addParam(PGVarchar{std::string{value}});
             return *this;
         }
 
@@ -305,7 +293,7 @@ public:
          * @return
          */
         Builder& addParam(char const* value) {
-            addParam(new PGVarchar{value});
+            addParam(PGVarchar{value});
             return *this;
         }
 
@@ -315,7 +303,7 @@ public:
          * @return
          */
         Builder& addParam(std::string const& value) {
-            addParam(new PGVarchar{std::string(value)});
+            addParam(PGVarchar{std::string(value)});
             return *this;
         }
 
@@ -325,7 +313,7 @@ public:
          * @return
          */
         Builder& addParam(unsigned long value) {
-            addParam(new PGBigUInt{value});
+            addParam(PGBigUInt{value});
             return *this;
         }
 
@@ -335,7 +323,7 @@ public:
          * @return
          */
         Builder& addParam(int value) {
-            addParam(new PGInt{value});
+            addParam(PGInt{value});
             return *this;
         }
 
@@ -345,7 +333,7 @@ public:
          * @return
          */
         Builder& addParam(double value) {
-            addParam(new PGFloat{value});
+            addParam(PGFloat{value});
             return *this;
         }
 
@@ -355,7 +343,7 @@ public:
          * @return
          */
         Builder& addParam(bool value) {
-            addParam(new PGBool{value});
+            addParam(PGBool{value});
             return *this;
         }
 
@@ -365,26 +353,23 @@ public:
          * @return
          */
         Builder& addParam(unsigned int value) {
-            addParam(new PGUInt{value});
+            addParam(PGUInt{value});
             return *this;
         }
     private:
-        void addParam(PGParam* param) {
-            managed->type = QUERY_WITH_PARAMS;
-            params.emplace_back(param);
+        void addParam(PGParam &&param) {
+            managed.type = QUERY_WITH_PARAMS;
+            params.emplace_back(std::move(param));
         }
+    };
+
+    static PGQueryParams::Builder<PGQueryParams> createBuilder(std::string &&sql) {
+        return PGQueryParams::Builder<PGQueryParams>::create(std::move(sql));
     };
 };
 
-static PGQueryParams::Builder q(std::string&& sql) {
-    return PGQueryParams::Builder::create(std::move(sql));
-};
-
-template <typename ...T>
-static PGQueryParams *q(std::string&& sql, T&& ...t) {
-    auto retVal = PGQueryParams::Builder::create(std::move(sql));
-    (retVal.addParam(t), ...);
-    return retVal.build();
+static PGQueryParams::Builder<PGQueryParams> q(std::string&& sql) {
+    return PGQueryParams::Builder<PGQueryParams>::create(std::move(sql));
 };
 
 #endif //PGQUEUE_PGQUERYPARAMS_HPP

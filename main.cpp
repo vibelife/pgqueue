@@ -8,12 +8,12 @@
 
 int main() {
     using namespace std::chrono_literals;
-    static constexpr size_t NB_QUERIES_TO_RUN = 230000; /* increase this number until the time is 1.0 seconds */
+    static constexpr size_t NB_QUERIES_TO_RUN = 1; /* increase this number until the time is 1.0 seconds */
 
     {
         // Create an instance of [PGQueryProcessor] that is connected to the database
         // - destructing the instance will disconnect from the database
-        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 19);
+        PGQueryProcessor *p = PGQueryProcessor::createInstance("host=/var/run/postgresql dbname=bugseeker user=bugseeker password=28077485", 32, 16, 1024, 8);
 
         // used for timing
         const auto t = now();
@@ -24,16 +24,18 @@ int main() {
             if (++count == NB_QUERIES_TO_RUN) {
                 printElapsed(t);
             }
+            // std::cout << resultSet.rows.front().get("session_id") << std::endl;
         };
+
 
 
         // send each query to the database in a tight loop
         for (int i{}; i < NB_QUERIES_TO_RUN; i += 1) {
             p->push(
-                PGQueryParams::Builder::create("select u.user_account_id, u.email, u.hashed_password, u.salt, u.create_date, u.password_alg_id, u.session_id, u.session_end_date from user_account u where u.user_account_id=$1")
-                    .addParam("df20a04e-10ae-44c1-904d-8b90bb29d486")
+                PGQueryParams::createBuilder("select u.user_account_id, u.email, u.hashed_password, u.salt, u.create_date, u.password_alg_id, u.session_id, u.session_end_date from user_account u where u.user_account_id=$1")
+                    .addParam("f8fe3c30-c3ee-43e3-b0f9-6829553aba64")
                     .build(),
-                cb
+                    cb
             );
         }
 

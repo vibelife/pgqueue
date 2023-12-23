@@ -21,13 +21,13 @@ struct PGQueryProcessingState {
     std::mutex mRequests{};
     // bool hasRequestsToProcess{false};
     LockStates requestsLockState{LockStates_WAIT};
-    rigtorp::MPMCQueue<PGQueryRequest*> requests;
+    rigtorp::MPMCQueue<PGQueryRequest> requests;
 
     std::condition_variable cvResponses{};
     std::mutex mResponses{};
     // bool hasResponsesToProcess{false};
     LockStates responsesLockState{LockStates_WAIT};
-    rigtorp::MPMCQueue<PGQueryResponse*> responses;
+    rigtorp::MPMCQueue<PGQueryResponse> responses;
 
     explicit PGQueryProcessingState(size_t queueDepths)
             :requests(queueDepths), responses(queueDepths)
@@ -39,9 +39,8 @@ struct PGQueryProcessingState {
         isRunning.clear();
         // clear up the requests
         while (!requests.empty()) {
-            PGQueryRequest *ptr{};
+            PGQueryRequest ptr;
             requests.pop(ptr);
-            delete ptr;
         }
 
         {

@@ -18,11 +18,11 @@
 class PGConnectionPool {
 private:
     static constexpr unsigned int NB_EVENTS = 2;
-    static constexpr auto isReadyFn = [](auto const& p) { return p.second->isReady(); };
-    static constexpr auto isDoneFn = [](auto const& p) { return p.second->isDone(); };
+    static constexpr auto isReadyFn = [](auto const& p) { return p.second.isReady(); };
+    static constexpr auto isDoneFn = [](auto const& p) { return p.second.isDone(); };
     std::jthread thrd;
     int epfd{};
-    std::unordered_map<int, PGConnection*> connections{};
+    std::unordered_map<int, PGConnection> connections{};
 private:
     static void printError(const char* errMsg, int err) {
         printf("[Error] %s: %s\n", errMsg, strerror(err));
@@ -41,10 +41,10 @@ private:
      */
     void connectAllEPoll(char const* connectionString, unsigned int nbConnections, unsigned int nbQueriesPerConnection) {
         for (int i = 0; i < nbConnections; i += 1) {
-            auto conn = new PGConnection(nbQueriesPerConnection);
-            if (conn->connect(connectionString) == PGConnection::PGConnectionResult_Ok) {
-                conn->setupEPoll(epfd);
-                connections.emplace(conn->fd(), conn);
+            auto conn = PGConnection{nbQueriesPerConnection};
+            if (conn.connect(connectionString) == PGConnection::PGConnectionResult_Ok) {
+                conn.setupEPoll(epfd);
+                connections.emplace(conn.fd(), std::move(conn));
             } else {
                 // if any connection fails, then we quit.
                 exit(EXIT_FAILURE);
@@ -55,9 +55,6 @@ private:
 public:
     ~PGConnectionPool() {
         close(epfd);
-        for (auto& p : connections) {
-            delete p.second;
-        }
         connections.clear();
     }
 
@@ -65,9 +62,10 @@ public:
      * Submits the query on the first available connection
      * @param request
      */
-    void submit(PGQueryRequest* request) {
+    void submit(PGQueryRequest &&request) {
         for (auto &[fd, conn]: connections) {
-            if (conn->sendRequestIfReady(request)) {
+            if (conn.isReady()) {
+                conn.sendRequest(std::move(request));
                 break;
             }
         }
@@ -115,9 +113,9 @@ public:
             drainQueue:
             // Drain the queue as much as we can
             while (!state.requests.empty() && hasReadyConnections()) {
-                PGQueryRequest* request{};
+                PGQueryRequest request;
                 state.requests.pop(request);
-                submit(request);
+                submit(std::move(request));
             }
 
             while (!isDone()) {
@@ -131,7 +129,7 @@ public:
                 }
 
                 for (int i = 0; i < nbFds; i += 1) {
-                    connections[events[i].data.fd]->doNextStep(1, state.responses, state);
+                    connections[events[i].data.fd].doNextStep(1, state.responses, state);
                 }
             }
 

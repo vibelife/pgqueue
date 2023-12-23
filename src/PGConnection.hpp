@@ -27,7 +27,7 @@ public:
 private:
     std::atomic<PGConnectionState> connectionState{PGConnectionState_NotSet};
     std::queue<std::function<void(PGResultSet&&)>> callbacks{};
-    int pgfd{};
+    int pgfd{-1};
     pg_conn* conn = nullptr;
     unsigned nbMaxPending{4};
 private:
@@ -40,7 +40,7 @@ private:
      * @param result
      * @param response
      */
-    static void handleResult(PGresult* result, PGQueryResponse* response) {
+    static void handleResult(PGresult* result, PGQueryResponse& response) {
         int nbRows = PQntuples(result);
         int nbFields = PQnfields(result);
 
@@ -49,7 +49,7 @@ private:
             for (int fieldIndex{}; fieldIndex < nbFields; fieldIndex += 1) {
                 row.addField(PQfname(result, fieldIndex), PQgetvalue(result, rowIndex, fieldIndex));
             }
-            response->resultSet.rows.emplace_back(std::move(row));
+            response.resultSet.rows.emplace_back(std::move(row));
         }
     }
 public:
@@ -57,11 +57,28 @@ public:
             :nbMaxPending(nbMaxPending)
     {}
 
+    PGConnection(PGConnection const& other) = delete;
+    PGConnection& operator=(PGConnection const& other) = delete;
+
+    PGConnection(PGConnection &&other) noexcept {
+        std::swap(this->conn, other.conn);
+        std::swap(this->callbacks, other.callbacks);
+        std::swap(this->pgfd, other.pgfd);
+        std::swap(this->nbMaxPending, other.nbMaxPending);
+        this->connectionState = static_cast<PGConnectionState>(other.connectionState);
+        other.connectionState = PGConnectionState::PGConnectionState_NotSet;
+    };
+
+
     ~PGConnection() {
-        if (PQstatus(conn) == CONNECTION_OK) {
-            PQfinish(conn);
+        if (conn != nullptr) {
+            if (PQstatus(conn) == CONNECTION_OK) {
+                PQfinish(conn);
+            }
         }
-        close(pgfd);
+        if (pgfd != -1) {
+            close(pgfd);
+        }
     }
 
     /**
@@ -152,57 +169,49 @@ public:
      * Sends the query to the database
      * @param request
      */
-    bool sendRequestIfReady(PGQueryRequest* request) {
-        if (isReady()) {
-            int res{};
-            switch (request->queryParams->type) {
-                case PGQueryParams::PLAIN_QUERY:
-                    res = PQsendQueryParams(
-                            conn,
-                            request->queryParams->command.c_str(),
-                            0,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            0
-                    );
-                    break;
-                case PGQueryParams::QUERY_WITH_PARAMS:
-                    res = PQsendQueryParams(
-                            conn,
-                            request->queryParams->command.c_str(),
-                            request->queryParams->nParams,
-                            request->queryParams->paramTypes,
-                            request->queryParams->paramValues,
-                            request->queryParams->paramLengths,
-                            request->queryParams->paramFormats,
-                            request->queryParams->resultFormat
-                    );
-                    break;
-            }
-
-            if (res == 0) {
-                printError(PQerrorMessage(conn));
-                exit(EXIT_FAILURE);
-            }
-
-            // steal the callback in the request
-            auto callback = std::move(request->callback);
-            // now we can delete the request
-            delete request;
-            // the callback will be used later when the SQL is processed
-            callbacks.push(std::move(callback));
-
-            res = PQflush(conn);
-            res = PQpipelineSync(conn);
-            return true;
+    void sendRequest(PGQueryRequest &&request) {
+        int res{};
+        switch (request.queryParams.type) {
+            case PGQueryParams::PLAIN_QUERY:
+                res = PQsendQueryParams(
+                        conn,
+                        request.queryParams.command.c_str(),
+                        0,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        nullptr,
+                        0
+                );
+                break;
+            case PGQueryParams::QUERY_WITH_PARAMS:
+                res = PQsendQueryParams(
+                        conn,
+                        request.queryParams.command.c_str(),
+                        request.queryParams.nParams,
+                        request.queryParams.paramTypes,
+                        request.queryParams.paramValues,
+                        request.queryParams.paramLengths,
+                        request.queryParams.paramFormats,
+                        request.queryParams.resultFormat
+                );
+                break;
         }
 
-        return false;
+        if (res == 0) {
+            printError(PQerrorMessage(conn));
+            exit(EXIT_FAILURE);
+        }
+
+        // steal the callback in the request
+        // the callback will be used later when the SQL is processed
+        callbacks.emplace(std::move(request.callback));
+
+        res = PQflush(conn);
+        res = PQpipelineSync(conn);
     }
 
-    void handleQueryResponse(rigtorp::MPMCQueue<PGQueryResponse*> &responses, PGQueryProcessingState &state) {
+    void handleQueryResponse(rigtorp::MPMCQueue<PGQueryResponse> &responses, PGQueryProcessingState &state) {
         checkPGReady:
         if (PQconsumeInput(conn) == 0) {
             printError("PQconsumeInput");
@@ -228,8 +237,8 @@ public:
                         continue;
                     }
 
-                    auto response = new PGQueryResponse{};
-                    std::swap(response->callback, callbacks.front());
+                    PGQueryResponse response{};
+                    std::swap(response.callback, callbacks.front());
                     callbacks.pop();
 
                     switch (status) {
@@ -249,9 +258,9 @@ public:
                         case PGRES_NONFATAL_ERROR:
                             break;
                         case PGRES_FATAL_ERROR:
-                            response->resultSet.errorMsg = PQresultErrorMessage(result);
-                            if (response->resultSet.errorMsg.empty()) {
-                                response->resultSet.errorMsg = PQerrorMessage(conn);
+                            response.resultSet.errorMsg = PQresultErrorMessage(result);
+                            if (response.resultSet.errorMsg.empty()) {
+                                response.resultSet.errorMsg = PQerrorMessage(conn);
                             }
                             break;
                         case PGRES_COPY_BOTH:
@@ -267,7 +276,7 @@ public:
                     }
                     PQclear(result);
 
-                    responses.push(response);
+                    responses.emplace(std::move(response));
                 }
             }
 
@@ -284,7 +293,7 @@ public:
         }
     }
 
-    void doNextStep(int res, rigtorp::MPMCQueue<PGQueryResponse*> &responses, PGQueryProcessingState &state) {
+    void doNextStep(int res, rigtorp::MPMCQueue<PGQueryResponse> &responses, PGQueryProcessingState &state) {
         handleQueryResponse(responses, state);
     }
 };

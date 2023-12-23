@@ -32,8 +32,8 @@ private:
      * Adds an item to the queue
      * @return
      */
-    void pushRequest(PGQueryRequest* request) {
-        state.requests.push(request);
+    void pushRequest(PGQueryRequest &&request) {
+        state.requests.emplace(std::move(request));
 
         {
             std::lock_guard lk(state.mRequests);
@@ -95,11 +95,10 @@ public:
                 lock.unlock();
 
                 while (!state.responses.empty()) {
-                    PGQueryResponse* response{};
+                    PGQueryResponse response;
                     state.responses.pop(response);
-                    auto cb = std::move(response->callback);
-                    auto resultSet = std::move(response->resultSet);
-                    delete response;
+                    auto cb = std::move(response.callback);
+                    auto resultSet = std::move(response.resultSet);
 
                     // there may not be a callback
                     if (cb != nullptr) {
@@ -125,7 +124,7 @@ public:
      */
     void push(std::string&& q, std::function<void(PGResultSet&&)>&& callback = nullptr) {
         if (state.isRunning.test()) {
-            pushRequest(new PGQueryRequest{false, PGQueryParams::Builder::create(std::move(q)).build(), std::move(callback)});
+            pushRequest(PGQueryRequest{PGQueryParams::Builder<>::create(std::move(q)).build(), std::move(callback)});
         }
     }
 
@@ -135,9 +134,9 @@ public:
      * @param callback - If this is null it is like a fire-and-forget.
      * @return
      */
-    void push(PGQueryParams* queryParams, std::function<void(PGResultSet&&)>&& callback = nullptr) {
-        if (state.isRunning.test() && queryParams != nullptr) {
-            pushRequest(new PGQueryRequest{false, queryParams, std::move(callback)});
+    void push(PGQueryParams &&queryParams, std::function<void(PGResultSet&&)>&& callback = nullptr) {
+        if (state.isRunning.test()) {
+            pushRequest(PGQueryRequest{std::move(queryParams), std::move(callback)});
         }
     }
 };
