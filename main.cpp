@@ -28,11 +28,16 @@ int main() {
             }
         };
 
+        std::string p1{"82616106-675e-47d2-95ed-6bf17327b71c"};
+        std::string p2{"https://test.local.example.com/default.html"};
+
         // send each query to the database in a tight loop
         for (int i{}; i < NB_QUERIES_TO_RUN; i += 1) {
             p->push(
-                PGQueryParams::createBuilder("select u.user_account_id, u.email, u.hashed_password, u.salt, u.create_date, u.password_alg_id, u.session_id, u.session_end_date from user_account u where u.user_account_id=$1")
-                    .addParam("f8fe3c30-c3ee-43e3-b0f9-6829553aba64")
+                /*PGQueryParams::createBuilder("select u.user_account_id, u.email, u.hashed_password, u.salt, u.create_date, u.password_alg_id, u.session_id, u.session_end_date from user_account u where u.user_account_id=$1")*/
+                PGQueryParams::createBuilder("select web_page_id::varchar from get_web_page($1, $2)")
+                    .addParam(p1)
+                    .addParam(p2)
                     .build(),
                     cb
             );

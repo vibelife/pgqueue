@@ -153,6 +153,30 @@ public:
      */
     int resultFormat{};
 public:
+    PGQueryParams() = default;
+    PGQueryParams(PGQueryParams&& other) noexcept {
+        std::swap(this->type, other.type);
+        std::swap(this->command, other.command);
+        std::swap(this->nParams, other.nParams);
+        std::swap(this->paramTypes, other.paramTypes);
+        std::swap(this->paramValues, other.paramValues);
+        std::swap(this->paramLengths, other.paramLengths);
+        std::swap(this->paramFormats, other.paramFormats);
+        std::swap(this->resultFormat, other.resultFormat);
+    }
+
+    PGQueryParams& operator=(PGQueryParams&& other) noexcept {
+        std::swap(this->type, other.type);
+        std::swap(this->command, other.command);
+        std::swap(this->nParams, other.nParams);
+        std::swap(this->paramTypes, other.paramTypes);
+        std::swap(this->paramValues, other.paramValues);
+        std::swap(this->paramLengths, other.paramLengths);
+        std::swap(this->paramFormats, other.paramFormats);
+        std::swap(this->resultFormat, other.resultFormat);
+        return *this;
+    }
+
     ~PGQueryParams() {
         if (paramTypes != nullptr) {
             free(paramTypes);
