@@ -17,7 +17,7 @@
 
 class PGConnectionPool {
 private:
-    static constexpr unsigned int NB_EVENTS = 2;
+    static constexpr unsigned int NB_EVENTS = 16;
     static constexpr auto isReadyFn = [](auto const& p) { return p.second.isReady(); };
     static constexpr auto isDoneFn = [](auto const& p) { return p.second.isDone(); };
     std::jthread thrd;
